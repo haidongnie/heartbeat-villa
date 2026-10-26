@@ -1,0 +1,189 @@
+{
+  "linye": {
+    "preview": "01a177cb-86cf-7198-b391-2b1a2b2f9452",
+    "refine": "01a177d0-7377-77b9-ad92-6dd507a91090",
+    "rig": "01a177d1-27a6-7565-a068-5b4e700fef6f",
+    "anim": "01a177d1-ceaf-7182-b53c-ead5dc62d76a",
+    "clips": [
+      "idle",
+      "walk",
+      "wave",
+      "heart",
+      "angry",
+      "shock",
+      "dance",
+      "sit",
+      "talk",
+      "heartbreak"
+    ]
+  },
+  "luxiao": {
+    "preview": "01a177cb-86cc-7078-9909-06a0c0d1ec99",
+    "refine": "01a177cb-fddb-73a8-a313-8d1038de594b",
+    "rig": "01a177cc-8c06-75ef-96c8-8ee48cadb236",
+    "anim": "01a177cd-331d-71f7-976c-9c0dd4a32804",
+    "clips": [
+      "idle",
+      "walk",
+      "wave",
+      "heart",
+      "angry",
+      "shock",
+      "dance",
+      "sit",
+      "talk",
+      "heartbreak"
+    ]
+  },
+  "baizhi": {
+    "preview": "01a177cb-86d5-7278-be33-eaec5c03dc83",
+    "refine": "01a177d0-737b-775f-abb6-aa72df235169",
+    "rig": "01a177d1-2993-720e-b4ba-2b505fed0af2",
+    "anim": "01a177d1-bd6f-74b4-8bf8-cd0ff3dd12df",
+    "clips": [
+      "idle",
+      "walk",
+      "wave",
+      "heart",
+      "angry",
+      "shock",
+      "dance",
+      "sit",
+      "talk",
+      "heartbreak"
+    ]
+  },
+  "guchen": {
+    "preview": "01a177cb-86bc-7507-8319-a5e5a7438907",
+    "refine": "01a177d0-7366-77e9-a8c3-ef237ae35098",
+    "rig": "01a177d1-2734-7594-95c6-cfb2f33f0f67",
+    "anim": "01a177d1-c391-716d-a36b-3dc72bf4c6b5",
+    "clips": [
+      "idle",
+      "walk",
+      "wave",
+      "heart",
+      "angry",
+      "shock",
+      "dance",
+      "sit",
+      "talk",
+      "heartbreak"
+    ]
+  },
+  "xiaoman": {
+    "preview": "01a177cb-86c7-71ff-ae9f-3c348863a017",
+    "refine": "01a177d0-737b-7761-beb6-af3730cda06f",
+    "rig": "01a177d1-2940-77a3-8f64-f993213c428a",
+    "anim": "01a177d1-ce42-7643-9e43-0e4adf0724a3",
+    "clips": [
+      "idle",
+      "walk",
+      "wave",
+      "heart",
+      "angry",
+      "shock",
+      "dance",
+      "sit",
+      "talk",
+      "heartbreak"
+    ]
+  },
+  "molly": {
+    "preview": "01a177cb-86da-703f-9f84-aefc6fe6c157",
+    "refine": "01a177d0-7321-725e-97d0-3c1904b367f4",
+    "rig": "01a177d1-29cf-710e-b03f-feff134801c9",
+    "anim": "01a177d1-c35c-74a6-8662-d46c943cf2ea",
+    "clips": [
+      "idle",
+      "talk",
+      "talk2",
+      "wave",
+      "cheer",
+      "shock",
+      "bow"
+    ]
+  },
+  "sofa": {
+    "preview": "01a177cb-86c7-7135-a152-4b627e245699",
+    "refine": "01a177cb-d8b4-76de-82fe-0a08be2a155f"
+  },
+  "lounger": {
+    "preview": "01a177cb-86cb-74fa-a491-394b95fc56d7",
+    "refine": "01a177d0-732b-702d-a409-05c56ae26f69"
+  },
+  "umbrella": {
+    "preview": "01a177cb-86ce-71f3-9f4e-690187c69426",
+    "refine": "01a177d0-7337-7476-b874-ee4f3fd346b7"
+  },
+  "palm": {
+    "preview": "01a177cb-d73b-764e-982c-250b57b909c5",
+    "refine": "01a177cc-26b2-70d6-8100-d5b1c9fe6379"
+  },
+  "bar": {
+    "preview": "01a177cb-db10-7661-8ed3-d892289be884",
+    "refine": "01a177d0-75e4-7753-9e55-b303e53ab289"
+  },
+  "bonfire": {
+    "preview": "01a177cb-f70f-73c9-92ae-a297feb67dd0",
+    "refine": "01a177d0-7805-746c-b17d-8e481fc35f6a"
+  },
+  "logbench": {
+    "preview": "01a177cb-f897-75b8-8972-179bbefa4467",
+    "refine": "01a177d0-e50e-7461-ab2c-f1ffc4b1776e"
+  },
+  "arch": {
+    "preview": "01a177cb-f93b-7719-a6b6-ce32adcd1df6",
+    "refine": "01a177d1-1189-7155-942b-b9f896f83eef"
+  },
+  "swing": {
+    "preview": "01a177cb-f94c-77ae-be70-c1320d559155",
+    "refine": "01a177d1-1171-7303-8579-2a658dc5331f"
+  },
+  "villa": {
+    "preview": "01a177cb-faa5-7081-9c7c-018c93e4e2ae",
+    "refine": "01a177d1-334d-713f-b955-9e37f3913456"
+  },
+  "flamingo": {
+    "preview": "01a177cb-fd0f-76e4-8f52-2f118c1897f6",
+    "refine": "01a177d1-7d8b-75ad-8705-833a1de003b7"
+  },
+  "monstera": {
+    "preview": "01a177cc-28c6-705f-89cb-b716a985c614",
+    "refine": "01a177d1-bc1a-7002-86ac-78bc84370a8a"
+  },
+  "rose": {
+    "preview": "01a177cc-478c-7524-a195-b231b2ce03fc",
+    "refine": "01a177d1-ec1c-715f-b97c-2a55d5cfb750"
+  },
+  "eggchair": {
+    "preview": "01a177cc-485f-775d-b131-e7ebc378668c",
+    "refine": "01a177d2-0bfe-703e-b49a-d030c1308c45"
+  },
+  "surfboard": {
+    "preview": "01a177cc-48cb-7771-85b4-ad38b20d05da",
+    "refine": "01a177d2-38bf-760f-a836-8e3d63cdc505"
+  },
+  "sutang": {
+    "preview": "01a177d0-6e1a-74a8-a356-527024290a3b",
+    "refine": "01a177d5-7fa0-71c1-ad09-00359036b360",
+    "rig": "01a177d6-16be-7497-af7f-6b49cfb9a9b0",
+    "anim": "01a177d6-b33b-7458-8264-a708a2000362",
+    "clips": [
+      "idle",
+      "walk",
+      "wave",
+      "heart",
+      "angry",
+      "shock",
+      "dance",
+      "sit",
+      "talk",
+      "heartbreak"
+    ]
+  },
+  "torch": {
+    "preview": "01a177d1-2eec-713c-a3d1-23a1e16f58e1",
+    "refine": "01a177d5-7ef2-762b-bbee-a13feae6892c"
+  }
+}

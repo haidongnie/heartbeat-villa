@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <title>心跳别墅 · Heartbeat Villa</title>
+  <meta name="description" content="1–6 人联机 3D 恋爱综艺游戏：四个夜晚，六位单身男女，一座藏着秘密的海岛别墅。" />
+  <meta property="og:title" content="心跳别墅 · Heartbeat Villa" />
+  <meta property="og:description" content="来心跳别墅入住吧——送玫瑰、发心动短信、被大屏幕爆料、在篝火旁告白。" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💗</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="labels"></div>
+  <div id="ui">
+    <div id="letterbox"><i></i><i></i></div>
+    <div id="huazi"></div>
+    <div id="epcard"></div>
+    <div id="namecard"></div>
+    <div id="reveal"></div>
+    <div id="subtitle"></div>
+    <div id="waitnote"></div>
+    <div id="toast"></div>
+
+    <div id="hud" hidden>
+      <div class="top">
+        <div class="badge"><span class="ep"></span><span class="ph"></span><span class="timer" hidden></span></div>
+        <div class="tools">
+          <button class="skip" title="房主：跳过当前环节" hidden>⏭</button>
+          <button class="invite" title="复制邀请链接">💌 邀请</button>
+          <button class="mute" title="静音">🔊</button>
+        </div>
+      </div>
+      <div class="mecard" hidden></div>
+      <div class="feed"></div>
+      <div class="bottom">
+        <div class="chat"><input maxlength="40" placeholder="按 Enter 说话……" /></div>
+        <div class="emotes">
+          <button data-a="wave" title="打招呼 1">👋</button>
+          <button data-a="heart" title="比心 2">💗</button>
+          <button data-a="talk" title="聊天 3">🗣️</button>
+          <button data-a="angry" title="生气 4">😤</button>
+          <button data-a="shock" title="震惊 5">😱</button>
+          <button data-a="dance" title="跳舞 6">💃</button>
+          <button class="rose" hidden disabled>🌹</button>
+        </div>
+      </div>
+      <div id="joy"><i></i></div>
+      <div class="help">WASD 移动 · Shift 快走 · 拖动鼠标转视角 · 1–6 表情 · R 送玫瑰 · Enter 聊天</div>
+    </div>
+
+    <div id="modal" hidden></div>
+    <div id="finale" hidden></div>
+
+    <div id="casting" hidden>
+      <div class="head">
+        <h1>选择你的嘉宾</h1>
+        <p class="waiting"></p>
+      </div>
+      <div class="cards"></div>
+      <aside>
+        <label>你的昵称<input class="nick" maxlength="12" /></label>
+        <div class="invite"><span>邀请朋友入住</span><input readonly /><button>复制链接</button></div>
+        <div class="players"><span>已入住</span><ul class="plist"></ul></div>
+        <button class="start" hidden>🎬 开播！</button>
+      </aside>
+    </div>
+
+    <div id="title" hidden>
+      <div class="logo">
+        <small>HEARTBEAT VILLA · SEASON 7</small>
+        <h1>心跳别墅</h1>
+        <p>四个夜晚，六位单身男女，一座藏着秘密的海岛别墅。<br />还有一块只说真话的大屏幕。</p>
+      </div>
+      <button class="go"></button>
+      <p class="sub2"></p>
+    </div>
+
+    <div id="loading">
+      <h1>心跳别墅</h1>
+      <div class="bar"><i></i></div>
+      <p class="hint">正在布置海岛……</p>
+    </div>
+    <div id="fade"></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,455 @@
+{
+  "notes": "Meshy text-to-3D (smart-topology / meshy-t2.5) prompts for Heartbeat Villa. Characters are rigged and animated; clip names map to src/game/anims.ts.",
+  "assets": [
+    {
+      "id": "linye",
+      "kind": "character",
+      "height": 1.84,
+      "polycount": 20000,
+      "prompt": "Full-body tall handsome young East Asian man in his late twenties, slicked-back glossy black hair, sharp jawline, cool aloof expression. Wearing a fitted black silk dress shirt with the top buttons open and sleeves rolled to the forearms, tucked into tailored charcoal trousers, black leather belt with silver buckle, polished black leather loafers, silver wristwatch. Standing in a neutral A-pose, arms held away from the body, legs slightly apart, open empty hands. Polished stylized semi-realistic 3D game character for a romance reality show, attractive appealing face, realistic proportions, single character, nothing in hands, no base, no background.",
+      "texture": "Black silk shirt with soft sheen, charcoal wool trousers, polished black leather belt and loafers, brushed silver watch and buckle, glossy jet-black hair, fair East Asian skin, defined brows, dark brown eyes, subtle natural lips. Stylized PBR, clean crisp face details, soft skin shading, no text, no logos.",
+      "actions": [
+        {
+          "id": 0,
+          "name": "idle"
+        },
+        {
+          "id": 107,
+          "name": "walk"
+        },
+        {
+          "id": 28,
+          "name": "wave"
+        },
+        {
+          "id": 27,
+          "name": "heart"
+        },
+        {
+          "id": 26,
+          "name": "angry"
+        },
+        {
+          "id": 333,
+          "name": "shock"
+        },
+        {
+          "id": 78,
+          "name": "dance"
+        },
+        {
+          "id": 33,
+          "name": "sit"
+        },
+        {
+          "id": 313,
+          "name": "talk"
+        },
+        {
+          "id": 391,
+          "name": "heartbreak"
+        }
+      ]
+    },
+    {
+      "id": "sutang",
+      "kind": "character",
+      "height": 1.65,
+      "polycount": 20000,
+      "prompt": "Full-body pretty young East Asian woman in her early twenties, long wavy pastel pink hair with soft bangs, sweet flirtatious smile. Wearing a short fitted pink satin slip mini dress that ends above the knees, thin spaghetti straps, bare arms and bare legs, white strappy flat sandals, tiny heart-shaped earrings. Standing in a neutral A-pose, arms held away from the body, legs slightly apart, open empty hands. Polished stylized semi-realistic 3D game character for a romance reality show, attractive appealing face, realistic proportions, single character, no long skirt, no sleeves, no train, nothing in hands, no base, no background.",
+      "texture": "Glossy pastel pink satin mini dress, white leather strappy sandals, pastel pink wavy hair with soft highlights, fair East Asian skin with rosy blush, big sparkling brown eyes, glossy pink lips. Stylized PBR, clean crisp face details, soft skin shading, no text, no logos.",
+      "actions": [
+        {
+          "id": 0,
+          "name": "idle"
+        },
+        {
+          "id": 108,
+          "name": "walk"
+        },
+        {
+          "id": 28,
+          "name": "wave"
+        },
+        {
+          "id": 27,
+          "name": "heart"
+        },
+        {
+          "id": 26,
+          "name": "angry"
+        },
+        {
+          "id": 333,
+          "name": "shock"
+        },
+        {
+          "id": 76,
+          "name": "dance"
+        },
+        {
+          "id": 32,
+          "name": "sit"
+        },
+        {
+          "id": 313,
+          "name": "talk"
+        },
+        {
+          "id": 391,
+          "name": "heartbreak"
+        }
+      ]
+    },
+    {
+      "id": "luxiao",
+      "kind": "character",
+      "height": 1.86,
+      "polycount": 20000,
+      "prompt": "Full-body athletic young East Asian man, tousled short dark brown hair, tanned sun-kissed skin, bright confident grin. Wearing a white sleeveless tank top, turquoise Hawaiian board shorts with white hibiscus flower print, simple black slide sandals, a braided cord bracelet. Standing in a neutral A-pose, arms held away from the body, legs slightly apart, open empty hands. Polished stylized semi-realistic 3D game character for a romance reality show, attractive appealing face, realistic proportions, single character, nothing in hands, no base, no background.",
+      "texture": "Clean white cotton tank top, turquoise board shorts with white hibiscus print, black rubber slides, brown braided bracelet, tousled dark brown hair, warm tanned East Asian skin, bright white teeth, dark brown eyes. Stylized PBR, clean crisp face details, soft skin shading, no text, no logos.",
+      "actions": [
+        {
+          "id": 0,
+          "name": "idle"
+        },
+        {
+          "id": 30,
+          "name": "walk"
+        },
+        {
+          "id": 28,
+          "name": "wave"
+        },
+        {
+          "id": 27,
+          "name": "heart"
+        },
+        {
+          "id": 26,
+          "name": "angry"
+        },
+        {
+          "id": 333,
+          "name": "shock"
+        },
+        {
+          "id": 74,
+          "name": "dance"
+        },
+        {
+          "id": 33,
+          "name": "sit"
+        },
+        {
+          "id": 313,
+          "name": "talk"
+        },
+        {
+          "id": 391,
+          "name": "heartbreak"
+        }
+      ]
+    },
+    {
+      "id": "baizhi",
+      "kind": "character",
+      "height": 1.7,
+      "polycount": 20000,
+      "prompt": "Full-body elegant cool young East Asian woman in her late twenties, long sleek straight black hair, thin gold-rimmed round glasses, calm intelligent expression. Wearing a white off-shoulder fitted blouse, high-waisted beige wide-leg tailored trousers, nude pointed low heels, small pearl earrings. Standing in a neutral A-pose, arms held away from the body, legs slightly apart, open empty hands. Polished stylized semi-realistic 3D game character for a romance reality show, attractive appealing face, realistic proportions, single character, nothing in hands, no base, no background.",
+      "texture": "Crisp white cotton blouse, beige linen wide-leg trousers, nude leather heels, thin gold glasses frames, white pearls, sleek glossy black hair, porcelain fair East Asian skin, calm dark eyes, soft mauve lips. Stylized PBR, clean crisp face details, soft skin shading, no text, no logos.",
+      "actions": [
+        {
+          "id": 0,
+          "name": "idle"
+        },
+        {
+          "id": 117,
+          "name": "walk"
+        },
+        {
+          "id": 28,
+          "name": "wave"
+        },
+        {
+          "id": 27,
+          "name": "heart"
+        },
+        {
+          "id": 26,
+          "name": "angry"
+        },
+        {
+          "id": 333,
+          "name": "shock"
+        },
+        {
+          "id": 68,
+          "name": "dance"
+        },
+        {
+          "id": 32,
+          "name": "sit"
+        },
+        {
+          "id": 313,
+          "name": "talk"
+        },
+        {
+          "id": 391,
+          "name": "heartbreak"
+        }
+      ]
+    },
+    {
+      "id": "guchen",
+      "kind": "character",
+      "height": 1.8,
+      "polycount": 20000,
+      "prompt": "Full-body slim handsome young East Asian man, medium-length messy black hair with silver-grey streaks falling over his forehead, small silver hoop earring, moody brooding expression. Wearing a black leather biker jacket over a plain white t-shirt, slim ripped black jeans, black leather ankle boots, silver chain necklace. Standing in a neutral A-pose, arms held away from the body, legs slightly apart, open empty hands. Polished stylized semi-realistic 3D game character for a romance reality show, attractive appealing face, realistic proportions, single character, nothing in hands, no base, no background.",
+      "texture": "Worn black leather jacket with silver zippers, soft white cotton t-shirt, faded black denim with rips, black leather boots, silver chain and hoop, messy black hair with silver-grey streaks, pale East Asian skin, dark smoky eyes. Stylized PBR, clean crisp face details, soft skin shading, no text, no logos.",
+      "actions": [
+        {
+          "id": 0,
+          "name": "idle"
+        },
+        {
+          "id": 563,
+          "name": "walk"
+        },
+        {
+          "id": 28,
+          "name": "wave"
+        },
+        {
+          "id": 27,
+          "name": "heart"
+        },
+        {
+          "id": 26,
+          "name": "angry"
+        },
+        {
+          "id": 333,
+          "name": "shock"
+        },
+        {
+          "id": 591,
+          "name": "dance"
+        },
+        {
+          "id": 33,
+          "name": "sit"
+        },
+        {
+          "id": 313,
+          "name": "talk"
+        },
+        {
+          "id": 391,
+          "name": "heartbreak"
+        }
+      ]
+    },
+    {
+      "id": "xiaoman",
+      "kind": "character",
+      "height": 1.62,
+      "polycount": 20000,
+      "prompt": "Full-body energetic cute young East Asian woman, short choppy bob haircut dyed bright tangerine orange, playful mischievous grin. Wearing a cropped lemon-yellow fitted t-shirt, baggy olive green cargo pants with side pockets, chunky white sneakers, colorful beaded bracelets. Standing in a neutral A-pose, arms held away from the body, legs slightly apart, open empty hands. Polished stylized semi-realistic 3D game character for a romance reality show, attractive appealing face, realistic proportions, single character, nothing in hands, no base, no background.",
+      "texture": "Bright lemon-yellow cotton crop top, olive green cotton cargo pants, chunky white leather sneakers, colorful beaded bracelets, vivid tangerine orange bob hair, warm light East Asian skin with freckles, lively brown eyes. Stylized PBR, clean crisp face details, soft skin shading, no text, no logos.",
+      "actions": [
+        {
+          "id": 0,
+          "name": "idle"
+        },
+        {
+          "id": 554,
+          "name": "walk"
+        },
+        {
+          "id": 28,
+          "name": "wave"
+        },
+        {
+          "id": 27,
+          "name": "heart"
+        },
+        {
+          "id": 26,
+          "name": "angry"
+        },
+        {
+          "id": 333,
+          "name": "shock"
+        },
+        {
+          "id": 82,
+          "name": "dance"
+        },
+        {
+          "id": 32,
+          "name": "sit"
+        },
+        {
+          "id": 313,
+          "name": "talk"
+        },
+        {
+          "id": 391,
+          "name": "heartbreak"
+        }
+      ]
+    },
+    {
+      "id": "molly",
+      "kind": "character",
+      "height": 1.72,
+      "polycount": 20000,
+      "prompt": "Full-body glamorous charismatic East Asian female TV show host in her thirties, voluminous wavy chestnut brown hair, bold red lipstick, confident dazzling smile. Wearing a sparkling gold sequin blazer with matching straight-leg trousers, black silk camisole, black stiletto heels, large gold hoop earrings. Standing in a neutral A-pose, arms held away from the body, legs slightly apart, open empty hands. Polished stylized semi-realistic 3D game character, attractive appealing face, realistic proportions, single character, nothing in hands, no base, no background.",
+      "texture": "Shimmering gold sequin blazer and trousers with sparkle, black silk camisole, glossy black stilettos, polished gold hoops, voluminous chestnut brown hair, fair East Asian skin, winged eyeliner, bold red lips. Stylized PBR, clean crisp face details, soft skin shading, no text, no logos.",
+      "actions": [
+        {
+          "id": 0,
+          "name": "idle"
+        },
+        {
+          "id": 313,
+          "name": "talk"
+        },
+        {
+          "id": 308,
+          "name": "talk2"
+        },
+        {
+          "id": 28,
+          "name": "wave"
+        },
+        {
+          "id": 59,
+          "name": "cheer"
+        },
+        {
+          "id": 333,
+          "name": "shock"
+        },
+        {
+          "id": 41,
+          "name": "bow"
+        }
+      ]
+    },
+    {
+      "id": "sofa",
+      "kind": "prop",
+      "polycount": 12000,
+      "prompt": "Luxury modern outdoor curved sectional sofa, woven natural rattan frame, thick plush white seat and back cushions, a few coral pink and teal throw pillows, low profile, resort villa lounge furniture, stylized realistic game asset, no base, no background.",
+      "texture": "Natural honey-colored woven rattan, soft off-white linen cushions, coral pink and teal velvet pillows. Realistic PBR, clean, no text."
+    },
+    {
+      "id": "lounger",
+      "kind": "prop",
+      "polycount": 6000,
+      "prompt": "Modern outdoor pool sun lounger chaise, white aluminum frame, plush white cushion with thin teal stripes, backrest raised at an angle, resort style, stylized realistic game asset, no base, no background.",
+      "texture": "Glossy white powder-coated aluminum, white canvas cushion with thin teal stripes. Realistic PBR, clean, no text."
+    },
+    {
+      "id": "umbrella",
+      "kind": "prop",
+      "polycount": 5000,
+      "prompt": "Large open round beach parasol umbrella, white and coral pink striped canvas canopy with scalloped fringe edge, natural wooden pole, on a flat round base, stylized realistic game asset, no background.",
+      "texture": "White and coral pink striped canvas, varnished natural wood pole, matte grey base. Realistic PBR, clean, no text."
+    },
+    {
+      "id": "palm",
+      "kind": "prop",
+      "polycount": 15000,
+      "prompt": "Tall tropical coconut palm tree with a gently curved slender ringed trunk and a lush crown of long arching green fronds, small cluster of coconuts, stylized realistic game asset, no base, no ground, no background.",
+      "texture": "Grey-brown ringed palm bark, vivid green glossy fronds with yellow-green tips, brown coconuts. Realistic PBR, no text."
+    },
+    {
+      "id": "bar",
+      "kind": "prop",
+      "polycount": 15000,
+      "prompt": "Tropical tiki cocktail bar counter with bamboo and dark wood front panel, thatched straw roof canopy on four bamboo posts, a few colorful liquor bottles and cocktail glasses on the counter, beach resort, stylized realistic game asset, no background.",
+      "texture": "Golden bamboo, dark polished wood counter, dry straw thatch, colorful glass bottles, clear cocktail glasses with orange and pink drinks. Realistic PBR, no text, no logos."
+    },
+    {
+      "id": "bonfire",
+      "kind": "prop",
+      "polycount": 8000,
+      "prompt": "Beach bonfire campfire pit, stacked crossed wooden logs in a teepee shape inside a ring of smooth grey stones, charred log ends, no flames, no smoke, stylized realistic game asset, no background.",
+      "texture": "Weathered wood logs with charred black ends and glowing orange ember cracks, smooth grey beach stones. Realistic PBR, no text."
+    },
+    {
+      "id": "logbench",
+      "kind": "prop",
+      "polycount": 4000,
+      "prompt": "Rustic beach log bench, a thick halved driftwood log as the flat seat resting on two short log stumps, long horizontal bench, stylized realistic game asset, no background.",
+      "texture": "Sun-bleached weathered driftwood with grain and cracks, natural bark on the stumps. Realistic PBR, no text."
+    },
+    {
+      "id": "arch",
+      "kind": "prop",
+      "polycount": 15000,
+      "prompt": "Romantic tall heart-shaped wedding flower arch, white metal frame densely covered with red and pink roses, white hydrangeas and green leaves, standing upright on two feet, big enough to walk through, stylized realistic game asset, no background.",
+      "texture": "Velvety red and pink roses, fluffy white hydrangeas, deep green leaves, glossy white metal frame. Realistic PBR, no text."
+    },
+    {
+      "id": "swing",
+      "kind": "prop",
+      "polycount": 12000,
+      "prompt": "Romantic wooden garden swing bench hanging by two thick ropes from a wooden A-frame, cushioned seat for two people, decorated with white flowers and climbing vines, stylized realistic game asset, no background.",
+      "texture": "Warm natural oak wood, beige rope, cream linen seat cushion, white flowers and green vines. Realistic PBR, no text."
+    },
+    {
+      "id": "torch",
+      "kind": "prop",
+      "polycount": 2000,
+      "prompt": "A single standalone tall tiki torch: one thin straight bamboo pole with a woven bamboo fuel canister on top, the pole tip planted directly into the ground, nothing else, no flame, no bucket, no barrel, no base, stylized realistic game asset, no background.",
+      "texture": "Golden bamboo pole with dark bindings, woven bamboo canister, sooty black top. Realistic PBR, no text."
+    },
+    {
+      "id": "villa",
+      "kind": "prop",
+      "polycount": 25000,
+      "prompt": "Luxury modern two-story tropical beach villa house, white smooth concrete walls, large floor-to-ceiling glass windows, flat roof with a teak wood pergola, teak wood wall accents, wide front terrace, stylized realistic game asset, whole building, no background.",
+      "texture": "Smooth warm white concrete, dark tinted glass windows with warm amber interior glow, rich teak wood slats and pergola, light stone terrace. Realistic PBR, no text, no logos."
+    },
+    {
+      "id": "flamingo",
+      "kind": "prop",
+      "polycount": 3000,
+      "prompt": "Inflatable pink flamingo pool float ring, glossy vinyl, cute stylized realistic game asset, no background.",
+      "texture": "Glossy bright pink vinyl with soft highlights, white and black beak, small yellow eye details. Realistic PBR, no text."
+    },
+    {
+      "id": "monstera",
+      "kind": "prop",
+      "polycount": 6000,
+      "prompt": "Potted tropical monstera plant in a large round terracotta pot, big glossy green split leaves, stylized realistic game asset, no background.",
+      "texture": "Glossy deep green monstera leaves with lighter veins, warm terracotta clay pot, dark soil. Realistic PBR, no text."
+    },
+    {
+      "id": "rose",
+      "kind": "prop",
+      "polycount": 3000,
+      "prompt": "Single perfect long-stem red rose with velvet petals in full bloom, green stem with two leaves, stylized realistic game asset, no background.",
+      "texture": "Deep crimson velvet rose petals, fresh green stem and leaves. Realistic PBR, no text."
+    },
+    {
+      "id": "eggchair",
+      "kind": "prop",
+      "polycount": 8000,
+      "prompt": "Hanging rattan egg chair on a curved black metal stand, round woven cocoon seat with a plush cream cushion, boho resort furniture, stylized realistic game asset, no background.",
+      "texture": "Natural woven rattan, matte black metal stand, plush cream fabric cushion. Realistic PBR, no text."
+    },
+    {
+      "id": "surfboard",
+      "kind": "prop",
+      "polycount": 2000,
+      "prompt": "Retro longboard surfboard standing upright, glossy turquoise with white and coral stripes, single fin, stylized realistic game asset, no background.",
+      "texture": "Glossy turquoise resin with white and coral racing stripes. Realistic PBR, no text, no logos."
+    }
+  ]
+}
