@@ -8,7 +8,10 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "meshy": "node tools/meshy.mjs",
-    "assets:optimize": "node tools/optimize.mjs"
+    "assets:optimize": "node tools/optimize.mjs",
+    "assets:textures": "node tools/textures.mjs",
+    "assets:env": "node tools/encode-uhdr.mjs",
+    "assets:fonts": "node tools/fonts.mjs"
   },
   "dependencies": {
     "playroomkit": "^0.0.97",

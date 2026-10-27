@@ -1,0 +1,18 @@
+{
+  "notes": "Meshy Text-to-Motion clips retargeted onto every contestant rig. Clip names are what src/game/interactions.ts plays. Prompts describe ONE person; the game stands the partner in front at the right distance.",
+  "characters": ["linye", "sutang", "luxiao", "baizhi", "guchen", "xiaoman"],
+  "motions": [
+    {
+      "id": "hug_over", "duration": 4,
+      "prompt": "A person standing in place reaches both arms forward and up to wrap them around the shoulders and neck of a slightly shorter partner standing directly in front, pulls them close into a warm tight hug, holds it while gently swaying side to side, then slowly lets go. Feet stay planted, no stepping."
+    },
+    {
+      "id": "hug_waist", "duration": 4,
+      "prompt": "A person standing in place reaches both arms forward around the waist and back of a slightly taller partner standing directly in front, rests the head against the partner's chest, holds the warm tight hug while gently swaying side to side, then slowly lets go. Feet stay planted, no stepping."
+    },
+    {
+      "id": "kiss", "duration": 3.5,
+      "prompt": "A person standing in place gently places both hands on the shoulders of a partner standing directly in front, leans the head forward and tilts it slightly to the side for a soft romantic kiss, holds it for a moment, then pulls back shyly and smiles. Feet stay planted, no stepping."
+    }
+  ]
+}

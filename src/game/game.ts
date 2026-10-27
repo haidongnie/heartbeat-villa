@@ -1,8 +1,10 @@
 import * as THREE from 'three/webgpu';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import type { PlayerState } from 'playroomkit';
-import { Assets } from '../core/assets';
-import { createRenderer, createPost, detectQuality, type Post } from '../core/renderer';
+import { Assets, PRIO } from '../core/assets';
+import { CAST_MODELS, CORE_PATHS, PROPS_EARLY, PROPS_LATE, SHOW_PATHS } from '../core/bootPlan';
+import { createRenderer, createPost, detectQuality, precompile, type Post } from '../core/renderer';
+import { portrait } from '../world/screen';
 import { Audio } from '../audio/audio';
 import {
   CAST, CHAR, CHAR_IDS, ENDINGS, HOST, HOST_LINES, HUAZI, LEAK_RESPONSES, TRUTH_CARDS, type CharId, type LeakResponse,
@@ -14,7 +16,9 @@ import { UI, PHASE_LABEL } from '../ui/ui';
 import { CameraRig } from './cameraRig';
 import { Character, lerpAngle } from './character';
 import { Director, BEAT } from './director';
-import { net, players, inviteLink, type Cast, type NetPose, type Phase, type Scores } from './net';
+import { ACT_HUAZI, ACT_TEXT, ASK_TIMEOUT, INTERACT, clipsFor, meetPoses, type Act, type Ask, type Kind } from './interactions';
+import { ProximityVoice, type Signal } from './voice';
+import { net, players, inviteLink, loadNet, type Cast, type NetPose, type Phase, type Scores } from './net';
 
 type Layout = 'free' | 'lineup' | 'stage' | 'seated' | 'finale';
 const LAYOUT: Record<string, Layout> = {
@@ -61,62 +65,169 @@ export class Game {
   private roseModel?: THREE.Object3D;
   private picked = false;
   private grade = { sat: 1.12, tint: new THREE.Color(1.04, 0.98, 0.95) };
+  /** core: the 3D title backdrop is drawable. show: every character + prop is in the scene (gates 开播 and entering the show). */
+  private readonly ready = { core: false, show: false };
+  private coreReady!: Promise<void>;
+  /** Boot hit a fatal error (no GPU, core assets unreachable): stop every timer that would hide the message. */
+  private failed = false;
+  /** A character keeps failing to download; shown in the load bar while it retries. */
+  private retrying = 0;
+  /** Characters staged in a hug/kiss: pose + clip until a time; overrides input, network and AI. */
+  private readonly locks = new Map<CharId, { until: number; pose: Pose; anim: string; partner: CharId }>();
+  /** A hug/kiss request waiting for my answer. */
+  private asked?: Ask;
+  /** Nearest other contestant (free roam), for roses and interactions. */
+  private near?: { c: CharId; d: number };
+  private voice?: ProximityVoice;
+  private voiceSyncT = 0;
 
   // ------------------------------------------------------------------ boot
   async boot() {
     const canvas = document.getElementById('c') as HTMLCanvasElement;
-    this.ui.progress(0.03, '正在点亮霓虹灯……');
-    this.renderer = await createRenderer(canvas, this.quality);
+    const t0 = performance.now();
+    // 1) t=0: queue every download (Assets runs 6 at a time in PRIO order) before touching the GPU.
+    //    World's constructor builds everything that needs no file, including the complete collision map.
     this.world = new World(this.assets, this.quality === 'high' ? 2048 : 1024);
-    await this.world.build((p) => this.ui.progress(0.05 + p * 0.85, '正在布置海岛……'));
-    this.ui.progress(0.75, '嘉宾正在化妆……');
-    await this.loadCast();
-    this.ui.progress(0.97, '茉莉正在试麦……');
-    this.post = createPost(this.renderer, this.world.scene, this.rig.camera, this.quality);
-    this.css.setSize(innerWidth, innerHeight);
-    document.getElementById('labels')!.append(this.css.domElement);
+    for (const id of CAST_MODELS) portrait(id);                 // 115 KB of portraits for casting / screen / HUD
+    const core = this.world.buildCore();                         // HDR + 7 ground textures + villa
+    let gpu!: () => void;
+    const gpuReady = new Promise<void>((r) => { gpu = r; });
+    this.coreReady = Promise.all([core, gpuReady]).then(() => undefined);
+    const cast = this.loadCast();
+    const placed = (group: THREE.Object3D) => this.coreReady.then(() => this.compile(group)).then(() => popIn(group));
+    const props = Promise.all([
+      this.world.streamProps(PROPS_EARLY, PRIO.early, placed),
+      this.world.streamProps(PROPS_LATE, PRIO.props, placed),
+    ]);
+    this.assets.model('rose', PRIO.extra).then((g) => { this.roseModel = g.scene; }, () => { /* optional: flyRose falls back */ });
+
+    // 2) Nothing below needs the GPU or a model, so the title button works as soon as this script has run.
     this.director = new Director({
       chars: this.chars,
       collision: this.world.collision,
       freeRoam: () => this.stage === 'show' && this.layout === 'free',
+      active: () => this.ready.show && this.stage === 'show',
       botEmote: (c, anim) => this.chars.get(c)?.play(anim),
     });
     this.world.onThunder = () => this.audio.thunder();
     this.world.effects.onBoom = () => this.audio.boom();
-    this.bindInput();
+    this.bindInput(canvas);
     this.bindUi();
     this.timer.connect(document);
-    // Title backdrop: the cast mingling around the pool at golden hour.
-    CHAR_IDS.forEach((c, i) => {
-      const ch = this.chars.get(c)!;
-      const a = (i / 6) * Math.PI * 2;
-      ch.place({ x: Math.cos(a) * 8.6, z: -3 + Math.sin(a) * 4.8, ry: faceTo(Math.cos(a) * 8.6, -3 + Math.sin(a) * 4.8, 0, -3) });
-      ch.play(i % 3 === 0 ? 'dance' : i % 3 === 1 ? 'talk' : 'idle', 0);
-    });
-    this.placeHost(false);
+    this.css.setSize(innerWidth, innerHeight);
+    document.getElementById('labels')!.append(this.css.domElement);
     window.addEventListener('resize', () => this.resize());
-    this.resize();
-    this.renderer.setAnimationLoop((t) => this.frame(t));
+    // The multiplayer chunk is fetched once the backdrop is up, or as soon as the player reaches for the button.
+    const warmNet = () => void loadNet().catch(() => { /* join() retries and reports */ });
+    const showTitle = () => {
+      if (this.ui.titleShown || this.failed) return;
+      this.ui.backdropMode();                                    // loading gradient stays as the backdrop, bar moves to #loadbar
+      this.ui.title(/[#&]r=/.test(location.hash), () => void this.join());
+      const go = document.querySelector('#title .go');
+      go?.addEventListener('pointerenter', warmNet, { once: true });
+      go?.addEventListener('touchstart', warmNet, { once: true, passive: true });
+    };
+    const titleTimer = setTimeout(showTitle, 1500);              // fast links: title appears together with the 3D scene
+    const ticker = setInterval(() => this.reportProgress(), 250);
+
+    try {
+      // 3) GPU (runs while the downloads are in flight).
+      this.renderer = await createRenderer(canvas, this.quality);
+      this.post = await createPost(this.renderer, this.world.scene, this.rig.camera, this.quality);
+      this.resize();
+      this.renderer.setAnimationLoop((t) => this.frame(t));      // netUpdate runs from now on; drawing waits for ready.core
+      gpu();
+
+      // 4) Core backdrop: precompile everything already in the scene, then one warm-up frame behind the opaque
+      //    overlay (shadow-map, PMREM, bloom/SMAA/output pipelines), then fade the overlay out.
+      await this.coreReady;
+      const tc = performance.now();
+      console.info(`[boot] gpu+core files ${Math.round(tc - t0)} ms`);
+      await this.compile(this.world.scene);
+      const tw = performance.now();
+      this.idleCamera(0);
+      this.rig.update(1);
+      this.post.render();
+      console.info(`[boot] precompile ${Math.round(tw - tc)} ms, warm-up frame ${Math.round(performance.now() - tw)} ms`);
+    } catch (e) {
+      // Fatal: without a GPU or the core scene the show cannot run. Keep the error visible (main.ts shows it).
+      this.failed = true;
+      clearTimeout(titleTimer);
+      clearInterval(ticker);
+      this.ui.failBoot();
+      throw e;
+    }
+    this.ready.core = true;
+    showTitle();
     this.ui.hideLoading();
-    this.ui.title(/[#&]r=/.test(location.hash), () => void this.join());
+    warmNet();
+    console.info(`[boot] backdrop ${Math.round(performance.now() - t0)} ms`);
+
+    // 5) The rest streams in; characters and props pop into the scene as they arrive.
+    await Promise.all([cast, props]);
+    this.ready.show = true;
+    this.castingSig = '';
+    clearInterval(ticker);
+    this.reportProgress();
+    console.info(`[boot] show-ready ${Math.round(performance.now() - t0)} ms`);
+    if (import.meta.env.PROD) {
+      // Copy everything this visit fetched into the service-worker cache (served from the HTTP cache, not the network).
+      navigator.serviceWorker?.ready.then((reg) => reg.active?.postMessage({ type: 'warm', urls: performance.getEntriesByType('resource').map((e) => e.name) }));
+    }
   }
 
-  private async loadCast() {
-    const ids = [...CHAR_IDS, HOST.id];
-    let n = 0;
-    await Promise.all(ids.map(async (id) => {
-      const gltf = await this.assets.model(id);
+  /** precompile() against the post-processing scene pass, so the first frame showing `root` does not stall. */
+  private compile(root: THREE.Object3D) {
+    return precompile(this.renderer, this.post, root, this.rig.camera, this.world.scene);
+  }
+
+  private reportProgress() {
+    if (this.failed) return;
+    const core = this.assets.progress(CORE_PATHS), all = this.assets.progress(SHOW_PATHS);
+    const label = !this.ready.core ? `正在布置海岛 ${Math.round(core * 100)}%`
+      : !this.ready.show ? (this.retrying ? '网络不稳，正在重试下载嘉宾……' : `嘉宾正在化妆 ${this.chars.size + (this.host ? 1 : 0)}/7 · ${Math.round(all * 100)}%`) : '';
+    if (!this.ready.core) this.ui.progress(core, '正在布置海岛……');
+    this.ui.loadbar(this.ready.show ? null : all, label);
+    this.ui.loadGate(this.ready.show ? null : all);
+    if (this.connected) {
+      const pct = this.ready.show ? 100 : Math.floor(all * 10) * 10;  // 10% steps: few Playroom writes
+      if (net.me().getState('load') !== pct) net.me().setState('load', pct, false);
+    }
+  }
+
+  /** Host + six contestants. Each one appears (with a heart burst) on its title-screen spot as soon as it is ready. */
+  private loadCast() {
+    return Promise.all(CAST_MODELS.map(async (id) => {
+      // After the title is up a cast download failure is not fatal: keep retrying with backoff (the Assets cache
+      // forgets failures), and the show stays gated until everyone has arrived.
+      let gltf;
+      for (let attempt = 0; ; attempt++) {
+        try { gltf = await this.assets.model(id, PRIO.cast); break; } catch (e) {
+          console.warn('[boot] cast model failed, retrying', id, e);
+          this.retrying++;
+          await new Promise((r) => setTimeout(r, Math.min(20000, 3000 * 2 ** attempt)));
+          this.retrying--;
+        }
+      }
       const def = id === HOST.id ? null : CHAR[id as CharId];
       const ch = new Character(id, gltf, def ? def.name : `主持人 ${HOST.name}`, def ? def.color : '#ffd36e');
+      if (def) {
+        const i = CHAR_IDS.indexOf(id as CharId), a = (i / 6) * Math.PI * 2;
+        const x = Math.cos(a) * 8.6, z = -3 + Math.sin(a) * 4.8;
+        ch.place({ x, z, ry: faceTo(x, z, 0, -3) });
+        ch.play(i % 3 === 0 ? 'dance' : i % 3 === 1 ? 'talk' : 'idle', 0);
+      } else ch.place({ x: HOST_SPOT.x, z: HOST_SPOT.z, ry: faceTo(HOST_SPOT.x, HOST_SPOT.z, 0, -6) });
+      await this.coreReady;
+      await this.compile(ch.root);
       this.world.scene.add(ch.root);
       if (def) this.chars.set(id as CharId, ch); else this.host = ch;
-      this.ui.progress(0.75 + 0.2 * (++n / ids.length));
+      this.world.effects.heartBurst(ch.x, 1.4, ch.z, 10);
+      this.castSig = '';                                         // re-apply name tags / ownership for the newcomer
     }));
-    try { this.roseModel = (await this.assets.model('rose')).scene; } catch { /* optional */ }
   }
 
   private resize() {
-    if (!innerWidth || !innerHeight) return; // hidden / zero-size viewport
+    if (!innerWidth || !innerHeight || !this.renderer) return; // hidden / zero-size viewport, or GPU not up yet
     this.renderer.setSize(innerWidth, innerHeight, false);
     this.rig.resize();
     this.css.setSize(innerWidth, innerHeight);
@@ -142,6 +253,23 @@ export class Game {
     net.rpc.register('event', async (d) => { this.onEvent(d); return 'ok'; });
     net.rpc.register('rose', async (d: { from: CharId; to: CharId }) => { if (net.isHost()) this.director.rose(d.from, d.to); return 'ok'; });
     net.rpc.register('claim', async (d: { c: CharId }, sender: PlayerState) => { if (net.isHost()) this.director.claim(d.c, sender.id); return 'ok'; });
+    net.rpc.register('interact', async (d: { from: CharId; to: CharId; kind: Kind }, sender: PlayerState) => {
+      if (net.isHost() && this.cast[d.from] === sender.id) this.director.interact(d.from, d.to, d.kind);
+      return 'ok';
+    });
+    net.rpc.register('ask', async (a: Ask) => { this.onAsk(a); return 'ok'; });
+    net.rpc.register('answer', async (d: { id: string; ok: boolean }, sender: PlayerState) => {
+      if (net.isHost()) this.director.answer(d.id, d.ok, sender.id);
+      return 'ok';
+    });
+    net.rpc.register('act', async (a: Act) => { this.onAct(a); return 'ok'; });
+    // Proximity voice: WebRTC signalling rides on Playroom RPC; every client ignores messages not addressed to it.
+    this.voice = new ProximityVoice(me.id, (to, sig) => net.rpc.call('rtc', { to, from: me.id, s: sig }, net.rpc.Mode.OTHERS));
+    this.voice.onMic = (on) => { me.setState('mic', on, true); this.ui.micState(on); };
+    net.rpc.register('rtc', async (d: { to: string; from: string; s: Signal }) => {
+      if (d.to === me.id) void this.voice?.onSignal(d.from, d.s);
+      return 'ok';
+    });
     this.ui.bindHud(net.isHost());
     this.stage = 'casting';
     this.renderCasting(true);
@@ -181,14 +309,17 @@ export class Game {
       }
       if (mine && taken[mine]) mine = undefined;
     }
-    const names = net.ordered().map((p) => this.nick(p) + (p.id === me.id ? '（你）' : ''));
-    const sig = JSON.stringify([taken, mine, names, midShow, net.isHost(), this.nick(me)]);
+    const loadTag = (p: PlayerState) => { const l = p.getState('load') as number | undefined; return l != null && l < 100 ? ` · 加载中 ${l}%` : ''; };
+    const names = net.ordered().map((p) => this.nick(p) + (p.id === me.id ? '（你）' : '') + loadTag(p));
+    const ready = this.ready.show;
+    const sig = JSON.stringify([taken, mine, names, midShow, net.isHost(), this.nick(me), ready]);
     if (!force && sig === this.castingSig) return;
     this.castingSig = sig;
     this.ui.casting({
-      name: this.nick(me), invite: inviteLink(), isHost: net.isHost(), midShow, taken, mine, players: names,
+      name: this.nick(me), invite: inviteLink(), isHost: net.isHost(), midShow, taken, mine, players: names, ready,
       onPick: (c) => {
         this.audio.pop();
+        if (midShow && !this.ready.show) { this.ui.toast('别墅还在加载，加载完成后就能接管这位嘉宾'); return; }
         if (midShow) {
           if (net.isHost()) this.director.claim(c, me.id);
           else net.rpc.call('claim', { c }, net.rpc.Mode.HOST);
@@ -196,7 +327,7 @@ export class Game {
         this.castingSig = '';
       },
       onName: (n) => { me.setState('name', n, true); this.castingSig = ''; },
-      onStart: () => { this.audio.pop(); this.director.startShow(); },
+      onStart: () => { if (!this.ready.show) return; this.audio.pop(); this.director.startShow(); },
     });
   }
 
@@ -205,11 +336,13 @@ export class Game {
     this.timer.update(time);
     const dt = Math.min(this.timer.getDelta(), 0.1);
     if (this.connected) this.netUpdate(dt);
+    if (this.voice) this.voiceUpdate(dt);
+    if (!this.ready.core) return;                 // nothing worth drawing yet; the overlay still covers the canvas
     if (this.stage === 'show') this.showUpdate(dt);
     else this.idleCamera(dt);
 
     for (const ch of this.chars.values()) ch.update(dt);
-    this.host.update(dt);
+    this.host?.update(dt);
     this.updateFlights(dt);
     this.world.update(dt, this.rig.camera);
     this.rig.update(dt);
@@ -250,7 +383,7 @@ export class Game {
       this.ui.setSkip(net.isHost());
     }
     const inCast = !!this.myChar;
-    if (stage === 'show' && this.stage !== 'show' && inCast) this.enterShow();
+    if (stage === 'show' && this.stage !== 'show' && inCast) { if (this.ready.show) this.enterShow(); }
     else if (stage === 'show' && this.stage === 'casting' && !inCast) this.renderCasting();
     else if (stage === 'casting' && this.stage === 'show') this.leaveShow();
     if (net.isHost() && stage === 'show') this.director.tick(dt);
@@ -262,7 +395,8 @@ export class Game {
     const prev = this.myChar;
     this.myChar = CHAR_IDS.find((c) => cast[c] === me);
     for (const c of CHAR_IDS) {
-      const ch = this.chars.get(c)!;
+      const ch = this.chars.get(c);
+      if (!ch) continue;                          // not loaded yet: loadCast() resets castSig when it arrives
       const pid = Director.humanOf(cast, c);
       ch.labelEl.classList.toggle('me', c === this.myChar);
       ch.setTag(pid ? (pid === me ? '你' : this.nick(players.get(pid))) : 'AI 嘉宾');
@@ -329,6 +463,8 @@ export class Game {
     if (this.phaseT < 1.5) this.phaseT = 0;
     this.fired.clear();
     this.overrides.clear();
+    this.locks.clear();
+    if (this.asked) { this.asked = undefined; this.ui.askCard(null); }
     this.picked = false;
     this.ui.closeChoice();
     this.ui.waitNote(null);
@@ -428,9 +564,15 @@ export class Game {
   private freeUpdate(dt: number) {
     const host = net.isHost();
     const npc = host ? undefined : net.get<Record<string, NetPose>>('npc');
+    const now = performance.now();
     for (const c of CHAR_IDS) {
       const ch = this.chars.get(c)!;
       ch.forced = false;
+      const lock = this.locks.get(c);
+      if (lock) {
+        if (now < lock.until) { ch.place(lock.pose); ch.play(lock.anim, 0.25); continue; }
+        this.locks.delete(c);
+      }
       if (c === this.myChar) { this.moveMe(ch, dt); continue; }
       const pid = Director.humanOf(this.cast, c);
       if (pid) {
@@ -447,9 +589,142 @@ export class Game {
       }
     }
     const me = this.myChar && this.chars.get(this.myChar);
-    if (me) this.rig.follow(me.headPos(new THREE.Vector3()));
+    const myLock = this.myChar ? this.locks.get(this.myChar) : undefined;
+    if (me && myLock) this.shotCouple(me, this.chars.get(myLock.partner)!);
+    else if (me) this.rig.follow(me.headPos(new THREE.Vector3()));
     else this.idleCamera(dt);
+    this.updateNear();
     this.updateRoseTarget();
+  }
+
+  /** Side two-shot of a hug/kiss, on whichever side the camera already is. */
+  private shotCouple(a: Character, b: Character) {
+    const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+    let nx = -(b.z - a.z), nz = b.x - a.x;
+    const L = Math.hypot(nx, nz) || 1; nx /= L; nz /= L;
+    const cam = this.rig.camera.position;
+    if ((cam.x - mx) * nx + (cam.z - mz) * nz < 0) { nx = -nx; nz = -nz; }
+    const h = Math.min(a.height, b.height);
+    this.rig.shot(v3(mx + nx * 2.5, h + 0.05, mz + nz * 2.5), v3(mx, h - 0.15, mz), 40, 3);
+  }
+
+  private updateNear() {
+    if (!this.myChar) { this.near = undefined; return; }
+    const me = this.chars.get(this.myChar)!;
+    let best: { c: CharId; d: number } | undefined;
+    for (const c of CHAR_IDS) {
+      if (c === this.myChar) continue;
+      const o = this.chars.get(c)!;
+      const d = Math.hypot(o.x - me.x, o.z - me.z);
+      if (d < 2.8 && (!best || d < best.d)) best = { c, d };
+    }
+    this.near = best;
+    const ph = this.phase?.id;
+    const can = (ph === 'roam' || ph === 'text') && !this.locks.has(this.myChar) && !!best && best.d <= INTERACT.hug.range;
+    this.ui.actButtons(ph === 'roam' || ph === 'text' ? (can ? CHAR[best!.c].name : '') : null);
+  }
+
+  // ---------------------------------------------------------------- hugs & kisses
+  private requestAct(kind: Kind) {
+    const ph = this.phase?.id;
+    if (this.layout !== 'free' || !this.myChar || !(ph === 'roam' || ph === 'text') || this.locks.has(this.myChar)) return;
+    const t = this.near;
+    if (!t || t.d > INTERACT[kind].range) { this.ui.toast(`走近一点才能${INTERACT[kind].label}`); return; }
+    const payload = { from: this.myChar, to: t.c, kind };
+    if (net.isHost()) {
+      if (!this.director.interact(payload.from, payload.to, kind)) { this.ui.toast('现在不行，等一下再试'); return; }
+    } else net.rpc.call('interact', payload, net.rpc.Mode.HOST);
+    this.ui.toast(`${INTERACT[kind].emoji} 你想${INTERACT[kind].label}${CHAR[t.c].name}……`);
+  }
+
+  private onAsk(a: Ask) {
+    if (a.to !== this.myChar || this.stage !== 'show') return;
+    this.asked = a;
+    this.audio.heartbeat(1);
+    this.ui.askCard(`${INTERACT[a.kind].emoji} ${CHAR[a.from].name} 想${INTERACT[a.kind].label}你`, ASK_TIMEOUT, (ok) => this.answerAsk(ok));
+  }
+
+  private answerAsk(ok: boolean) {
+    const a = this.asked;
+    if (!a) return;
+    this.asked = undefined;
+    this.ui.askCard(null);
+    this.audio.pop();
+    if (net.isHost()) this.director.answer(a.id, ok, net.me().id);
+    else net.rpc.call('answer', { id: a.id, ok }, net.rpc.Mode.HOST);
+  }
+
+  /** Host-approved (or refused) interaction: everyone stages the same poses and clips locally. */
+  private onAct(a: Act) {
+    if (this.asked?.id === a.id) { this.asked = undefined; this.ui.askCard(null); } // decided without me (timeout)
+    if (this.stage !== 'show' || this.layout !== 'free') return;
+    const A = this.chars.get(a.from), B = this.chars.get(a.to);
+    if (!A || !B) return;
+    const host = net.isHost();
+    const mine = a.from === this.myChar || a.to === this.myChar;
+    if (a.ok && a.poses) {
+      const dur = INTERACT[a.kind].dur;
+      const [clipA, clipB] = clipsFor(a.kind, A, B);
+      const until = performance.now() + dur * 1000;
+      this.locks.set(a.from, { until, pose: a.poses[0], anim: clipA, partner: a.to });
+      this.locks.set(a.to, { until, pose: a.poses[1], anim: clipB, partner: a.from });
+      A.place(a.poses[0]); B.place(a.poses[1]);
+      if (host) {
+        if (!Director.humanOf(this.cast, a.from)) this.director.react(a.from, clipA, dur);
+        if (!Director.humanOf(this.cast, a.to)) this.director.react(a.to, clipB, dur);
+      }
+      this.ui.feed(ACT_TEXT[a.kind](CHAR[a.from].name, CHAR[a.to].name));
+      this.ui.huazi(rnd(ACT_HUAZI[a.kind]));
+      this.audio.chime();
+      const mx = (a.poses[0].x + a.poses[1].x) / 2, mz = (a.poses[0].z + a.poses[1].z) / 2, y = Math.min(A.height, B.height) + 0.15;
+      setTimeout(() => this.world.effects.heartBurst(mx, y, mz, a.kind === 'kiss' ? 22 : 14), a.kind === 'kiss' ? 1300 : 900);
+      if (mine) { this.emote.until = 0; this.rig.cut(); }
+    } else {
+      this.ui.feed(ACT_TEXT[a.reason === 'timeout' ? 'timeout' : 'no'](CHAR[a.from].name, CHAR[a.to].name, a.kind));
+      this.ui.huazi(rnd(ACT_HUAZI.no));
+      this.audio.sad();
+      if (a.from === this.myChar) {
+        this.ui.toast(`💔 ${CHAR[a.to].name}${a.reason === 'timeout' ? '没有回应' : '拒绝了你'}`);
+        this.emote = { anim: 'heartbreak', until: performance.now() + A.clipDuration('heartbreak') * 950 };
+      }
+      if (host) {
+        if (!Director.humanOf(this.cast, a.from)) this.director.react(a.from, 'heartbreak', A.clipDuration('heartbreak'));
+        if (!Director.humanOf(this.cast, a.to)) this.director.react(a.to, rnd(['angry', 'shock']), 2.5);
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- proximity voice
+  private voiceUpdate(dt: number) {
+    const v = this.voice!;
+    if ((this.voiceSyncT -= dt) <= 0) { this.voiceSyncT = 1; v.sync([...players.keys()]); }
+    const inShow = this.stage === 'show';
+    const me = inShow && this.myChar ? this.chars.get(this.myChar) : undefined;
+    const b = this.rig.basis();
+    v.update(me ? { x: me.x, y: me.height - 0.1, z: me.z } : null, { x: b.fx, z: b.fz }, (pid) => {
+      if (!inShow) return null;
+      const c = CHAR_IDS.find((k) => this.cast[k] === pid);
+      const ch = c && this.chars.get(c);
+      return ch ? { x: ch.x, y: ch.height - 0.1, z: ch.z } : null;
+    });
+    for (const c of CHAR_IDS) {
+      const ch = this.chars.get(c);
+      if (!ch) continue;
+      const pid = Director.humanOf(this.cast, c);
+      ch.labelEl.classList.toggle('mic', !!pid && players.get(pid)?.getState('mic') === true);
+      ch.labelEl.classList.toggle('talking', !!pid && v.level(pid) > 0.08);
+    }
+  }
+
+  private async toggleMic() {
+    if (!this.voice) { this.ui.toast('进入别墅后才能开麦'); return; }
+    try {
+      const on = await this.voice.setMic(!this.voice.micOn);
+      this.ui.toast(on ? '🎙️ 麦克风已打开：离得越近，听得越清楚' : '🔇 麦克风已关闭');
+    } catch (e) {
+      console.warn('[voice] mic', e);
+      this.ui.toast('无法使用麦克风：请在浏览器地址栏允许麦克风权限');
+    }
   }
 
   private moveMe(ch: Character, dt: number) {
@@ -495,14 +770,7 @@ export class Game {
     if (!ph || ph.id !== 'roam' || !this.myChar) { this.roseTarget = undefined; return; }
     const sent = (net.get<Record<string, number>>('rosesSent') ?? {})[this.myChar] === ph.data.round;
     if (sent) { this.ui.roseButton('idle'); this.roseTarget = undefined; this.setRoseLabel('🌹 今晚的玫瑰已送出'); return; }
-    const me = this.chars.get(this.myChar)!;
-    let best: CharId | undefined, bd = 2.8;
-    for (const c of CHAR_IDS) {
-      if (c === this.myChar) continue;
-      const o = this.chars.get(c)!;
-      const d = Math.hypot(o.x - me.x, o.z - me.z);
-      if (d < bd) { bd = d; best = c; }
-    }
+    const best = this.near?.c;
     if (best !== this.roseTarget) {
       this.roseTarget = best;
       this.ui.roseButton(best ? 'ready' : 'idle', best ? CHAR[best].name : '');
@@ -531,6 +799,7 @@ export class Game {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private onEvent(d: any) {
+    if (this.stage !== 'show') return;            // e.g. a mid-show guest still loading in the casting room
     if (d.k === 'rose') {
       const from = this.chars.get(d.from as CharId)!, to = this.chars.get(d.to as CharId)!;
       this.ui.feed(`🌹 <b style="--c:${CHAR[d.from as CharId].color}">${from.displayName}</b> 把玫瑰送给了 <b style="--c:${CHAR[d.to as CharId].color}">${to.displayName}</b>`);
@@ -825,9 +1094,19 @@ export class Game {
         const a = t * 0.05 + 1;
         this.rig.shot(v3(BONFIRE.x + Math.cos(a) * 13, 4.6, BONFIRE.z + Math.sin(a) * 13), v3(BONFIRE.x, 1.6, BONFIRE.z), 46, 1.2);
         const couples = (d.couples ?? []) as [CharId, CharId][];
-        this.at(0.3, 'dance', () => {
-          for (const [a2, b] of couples) { this.react(a2, 'dance', 3600); this.react(b, 'dance', 3600); }
+        this.at(0.3, 'kiss', () => {
+          for (const [x, y] of couples) {
+            const A = ch(x), B = ch(y);
+            const [pa, pb] = meetPoses(A, B, INTERACT.kiss.gap);
+            A.place(pa); B.place(pb);
+            this.react(x, 'kiss', INTERACT.kiss.dur); this.react(y, 'kiss', INTERACT.kiss.dur);
+            setTimeout(() => this.world.effects.heartBurst((pa.x + pb.x) / 2, 1.9, (pa.z + pb.z) / 2, 22), 1300);
+          }
+          if (couples.length) this.ui.huazi(rnd(ACT_HUAZI.kiss));
           this.react('host', 'cheer');
+        });
+        this.at(0.3 + INTERACT.kiss.dur, 'dance', () => {
+          for (const [x, y] of couples) { this.react(x, 'dance', 3600); this.react(y, 'dance', 3600); }
         });
         if (Math.floor(t / 1.3) !== Math.floor((t - 1 / 60) / 1.3)) this.world.effects.firework(BONFIRE.x + (Math.random() - 0.5) * 30, BONFIRE.z + 10 + Math.random() * 14);
         this.at(3, 'panel', () => this.showFinale(d));
@@ -868,12 +1147,16 @@ export class Game {
         const dx = BONFIRE.x - a.x, dz = BONFIRE.z - a.z, L = Math.hypot(dx, dz) || 1;
         const px = -dz / L, pz = dx / L;
         const ax = a.x + (dx / L) * 0.25, az = a.z + (dz / L) * 0.25;
-        a.place({ x: ax - px * 0.45, z: az - pz * 0.45, ry: faceTo(ax, az, BONFIRE.x, BONFIRE.z) });
-        c.place({ x: ax + px * 0.45, z: az + pz * 0.45, ry: faceTo(ax, az, BONFIRE.x, BONFIRE.z) });
+        // Face to face along the bench, so the fire-side camera sees the hug in profile.
+        const [pa, pc] = meetPoses({ x: ax - px, z: az - pz }, { x: ax + px, z: az + pz }, INTERACT.hug.gap);
+        a.place(pa); c.place(pc);
+        const [ca, cc] = clipsFor('hug', a, c);
         this.ui.reveal(this.ui.pairHtml(b.who, b.to, '💞', '双向奔赴！'));
         this.ui.huazi(rnd(HUAZI.match)); this.ui.huazi(rnd(HUAZI.match));
         this.audio.match();
-        this.react(b.who, 'dance', 999); this.react(b.to, 'dance', 999);
+        this.react(b.who, ca, INTERACT.hug.dur); this.react(b.to, cc, INTERACT.hug.dur);
+        const seq = this.phase?.seq;
+        setTimeout(() => { if (this.phase?.seq === seq) { this.react(b.who, 'dance', 999); this.react(b.to, 'dance', 999); } }, INTERACT.hug.dur * 1000);
         for (let k = 0; k < 4; k++) setTimeout(() => this.world.effects.firework(BONFIRE.x + (Math.random() - 0.5) * 16, BONFIRE.z + 10 + Math.random() * 6), k * 350);
         this.world.effects.heartBurst(ch(b.who).x, 2, ch(b.who).z, 20);
         this.world.effects.heartBurst(ch(b.to).x, 2, ch(b.to).z, 20);
@@ -928,17 +1211,21 @@ export class Game {
   }
 
   // ---------------------------------------------------------------- input
-  private bindInput() {
+  private bindInput(canvas: HTMLCanvasElement) {
     addEventListener('keydown', (e) => {
       if (document.activeElement instanceof HTMLInputElement) return;
       this.keys.add(e.code);
       const n = Number(e.key);
       if (n >= 1 && n <= 6) this.doEmote(EMOTE_KEYS[n - 1]);
       if (e.code === 'KeyR') this.giveRose();
+      if (e.code === 'KeyH') this.requestAct('hug');
+      if (e.code === 'KeyK') this.requestAct('kiss');
+      if (e.code === 'KeyM') void this.toggleMic();
+      if (e.code === 'KeyY' && this.asked) this.answerAsk(true);
+      if (e.code === 'KeyN' && this.asked) this.answerAsk(false);
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
     addEventListener('blur', () => this.keys.clear());
-    const canvas = this.renderer.domElement;
     let drag = -1, lx = 0, ly = 0;
     canvas.addEventListener('pointerdown', (e) => { drag = e.pointerId; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId); });
     canvas.addEventListener('pointermove', (e) => {
@@ -960,12 +1247,27 @@ export class Game {
     this.ui.onInvite = () => this.ui.copy(inviteLink());
     this.ui.onMute = () => this.audio.toggleMute();
     this.ui.onSkip = () => { if (net.isHost()) this.director.skip(); };
+    this.ui.onAct = (k) => this.requestAct(k);
+    this.ui.onMic = () => void this.toggleMic();
     this.ui.onChat = (text) => {
       if (!this.myChar) return;
       net.rpc.call('say', { c: this.myChar, m: text }, net.rpc.Mode.ALL);
       if (this.layout === 'free') this.emote = { anim: 'talk', until: performance.now() + 2500 };
     };
   }
+}
+
+/** Props arrive while the title camera orbits: grow them in instead of popping (scale only, no pipeline change). */
+function popIn(group: THREE.Object3D) {
+  const t0 = performance.now();
+  const kids = group.children.map((c) => [c, c.scale.clone()] as const);
+  for (const [c] of kids) c.scale.setScalar(1e-3);
+  const step = () => {
+    const k = Math.min(1, (performance.now() - t0) / 450), e = 1 + 2.2 * (k - 1) ** 3 + 1.2 * (k - 1) ** 2; // ease-out-back
+    for (const [c, s] of kids) c.scale.copy(s).multiplyScalar(Math.max(1e-3, e));
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 function escape(s: string) {

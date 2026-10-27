@@ -1,0 +1,21 @@
+{
+  "motion:hug_over": "01a17ba3-b63a-75b0-a5e1-da69c438377e",
+  "motion:kiss": "01a17ba3-b633-77e3-a950-c4bbe51719f4",
+  "motion:hug_waist": "01a17ba3-b643-7440-97e6-9398cc613dce",
+  "anim:luxiao.hug_over": "01a17ba4-0a40-738c-94f1-da868eb5396c",
+  "anim:sutang.hug_over": "01a17ba4-0c35-75a5-ad8c-5ca2069a3b51",
+  "anim:sutang.kiss": "01a17ba4-2877-7790-8cc9-1f39c0190078",
+  "anim:luxiao.kiss": "01a17ba4-2684-7230-91ad-4615c57576ff",
+  "anim:luxiao.hug_waist": "01a17ba4-5bf1-71a4-8df2-eac75c32fb8e",
+  "anim:sutang.hug_waist": "01a17ba4-5ddf-7122-b57b-850f98ff0244",
+  "anim:linye.hug_over": "01a17ba6-3e4c-76d4-97d8-0f1bfebbc05c",
+  "anim:guchen.hug_over": "01a17ba6-3e53-7161-bd0f-9867e252c221",
+  "anim:baizhi.hug_over": "01a17ba6-3e4f-72a9-ba37-aac671bc3e74",
+  "anim:xiaoman.hug_over": "01a17ba6-403c-75ef-9673-73a62b8d9692",
+  "anim:baizhi.kiss": "01a17ba6-4033-75ce-bc16-1e796ed25c85",
+  "anim:xiaoman.kiss": "01a17ba6-4037-736b-b02c-e49f7ab36243",
+  "anim:baizhi.hug_waist": "01a17ba6-4028-745b-bd58-43cf5ce1aade",
+  "anim:guchen.hug_waist": "01a17ba6-403c-7624-b1b1-f2ad02943c3a",
+  "anim:linye.hug_waist": "01a17ba6-4040-773c-9243-c8989906864d",
+  "anim:guchen.kiss": "01a17ba6-4048-76de-af40-fe7fa1dff8c0"
+}

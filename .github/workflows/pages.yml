@@ -28,6 +28,9 @@ jobs:
         env:
           BASE: /${{ github.event.repository.name }}/
           VITE_PLAYROOM_GAME_ID: ${{ vars.PLAYROOM_GAME_ID }}
+          VITE_TURN_URL: ${{ vars.TURN_URL }}
+          VITE_TURN_USER: ${{ vars.TURN_USER }}
+          VITE_TURN_CRED: ${{ secrets.TURN_CRED }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

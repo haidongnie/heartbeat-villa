@@ -2,7 +2,8 @@ import * as THREE from 'three/webgpu';
 import {
   texture, uv, time, vec2, vec3, color, normalMap, positionWorld, mix, smoothstep, uniform, float,
 } from 'three/tsl';
-import type { Assets } from '../core/assets';
+import { PRIO, type Assets } from '../core/assets';
+import { GROUND_TEX, HDR, POOL_TILES } from '../core/bootPlan';
 import { Collision } from './collision';
 import { Effects } from './fx';
 import { BigScreen, makeNeonSign } from './screen';
@@ -64,6 +65,17 @@ export const POIS: { name: string; x: number; z: number }[] = [
 
 interface PropSpec { name: string; x: number; z: number; rot: number; size: number; by: 'h' | 'w'; y?: number; solid?: 'box' | 'circle' | 'none'; r?: number }
 
+/**
+ * Collision footprints (w, d after the 0.92 shrink) for the 'box' props, measured from public/models with
+ * gltf-transform getBounds (scratch bounds.mjs). Hard-coding them registers collision before the GLBs arrive, so
+ * every client collides identically whatever it has loaded. placeProp() warns in dev if a re-exported model drifts.
+ */
+const FOOTPRINT: Record<string, [number, number]> = {
+  sofa: [3.588, 2.234], bar: [4.048, 1.970], lounger: [0.721, 1.932], swing: [2.392, 1.235],
+};
+/** Sun direction matching the sky's bright glow (azimuth measured from the source HDRI; elevation fixed at 26° for flattering shadows). */
+const SUN_DIR_SUNSET_2K = new THREE.Vector3(0.7111, 0.4384, 0.5497);
+
 const PALMS: [number, number, number][] = [
   [-22, -13, 9], [-24.5, -3, 8.2], [-23, 7, 9.5], [-18.5, 15.5, 8.6], [-10, 21, 9.2], [-3, 24.5, 8], [9.5, 22.5, 9.4],
   [20.5, 16, 8.8], [24.3, 5, 9.6], [23.5, -5.5, 8.4], [19.5, -14.5, 9], [-14.5, -16.5, 8.5], [14.2, -17.2, 8.2], [-8, 9, 7.6],
@@ -76,7 +88,7 @@ export class World {
   readonly sun = new THREE.DirectionalLight(0xffffff, 2);
   readonly screen = new BigScreen();
   bottle!: THREE.Group;
-  private sunDir = new THREE.Vector3(-0.6, 0.45, -0.66).normalize();
+  private sunDir = SUN_DIR_SUNSET_2K.clone().normalize();
   private fireLight = new THREE.PointLight(0xff7a2e, 0, 22, 1.6);
   private poolLight = new THREE.PointLight(0x3fe6ff, 0, 11, 1.6);
   private screenLight = new THREE.PointLight(0x9fb6ff, 0, 14, 1.8);
@@ -93,15 +105,16 @@ export class World {
   /** 0..1 lightning flash for the post grade. */
   flash = 0;
 
-  constructor(private readonly assets: Assets, private readonly shadowSize: number) {}
+  constructor(private readonly assets: Assets, private readonly shadowSize: number) {
+    this.buildStatic();
+  }
 
-  async build(onProgress?: (p: number) => void) {
+  /**
+   * Everything that needs no download: lights, fog, screen, stars, bottle, string lights, bonfire flames and the
+   * complete collision map. Runs in the constructor, so world.bottle / world.collision / scene.fog always exist.
+   */
+  private buildStatic() {
     const s = this.scene;
-    const hdr = await this.assets.hdr('env/sunset_2k.hdr');
-    s.environment = hdr;
-    s.background = hdr;
-    s.backgroundBlurriness = 0.02;
-    this.alignSunToHdr(hdr);
     s.fog = new THREE.Fog(0xc98a7e, 70, 300);
 
     this.sun.castShadow = true;
@@ -120,46 +133,46 @@ export class World {
     this.screenLight.position.set(SCREEN.x, 3.2, SCREEN.z + 3);
     s.add(this.fireLight, this.poolLight, this.screenLight);
 
-    await this.buildGround();
-    onProgress?.(0.1);
-    this.buildPool();
     this.buildScreen();
     this.buildStars();
     this.buildBottle();
-    await this.buildProps(onProgress);
     this.buildStringLights();
+    this.registerPropCollision();
     s.add(this.effects.group);
     this.effects.addFire(BONFIRE.x, 0.35, BONFIRE.z, 1.6);
     this.setTod('sunset', true);
   }
 
-  /** Point the shadow-casting sun at the HDRI's brightest pixel (azimuth only; elevation kept flattering). */
-  private alignSunToHdr(tex: THREE.Texture) {
-    const img = tex.image as { data: Uint16Array | Float32Array; width: number; height: number };
-    const half = img.data instanceof Uint16Array;
-    const val = (i: number) => (half ? THREE.DataUtils.fromHalfFloat(img.data[i]) : img.data[i]);
-    let best = -1, bx = 0, by = 0;
-    for (let y = 0; y < img.height; y += 2) {
-      for (let x = 0; x < img.width; x += 2) {
-        const i = (y * img.width + x) * 4;
-        const l = val(i) * 0.2126 + val(i + 1) * 0.7152 + val(i + 2) * 0.0722;
-        if (l > best) { best = l; bx = x; by = y; }
-      }
-    }
-    const phi = ((bx + 0.5) / img.width - 0.5) * Math.PI * 2;
-    const el = THREE.MathUtils.degToRad(26);
-    this.sunDir.set(Math.cos(phi) * Math.cos(el), Math.sin(el), Math.sin(phi) * Math.cos(el)).normalize();
-    console.info('[world] hdr sun pixel', bx, by, 'dir', this.sunDir.toArray().map((v) => v.toFixed(2)).join(','));
+  /** (a) The title backdrop: HDR lighting, island, sea, deck, pool, villa. Downloads run in parallel. */
+  async buildCore() {
+    const s = this.scene;
+    const [hdr] = await Promise.all([
+      this.assets.env(HDR, PRIO.core),
+      this.buildGround(),
+      this.assets.model('villa', PRIO.core),
+    ]);
+    s.environment = hdr;
+    s.background = hdr;
+    s.backgroundBlurriness = 0.02;
+    this.buildPool();
+    this.placeProp('villa', (await this.assets.model('villa')).scene);
+  }
+
+  /** Every non-core prop, streamed in by priority. onPlaced runs before the group is added to the scene. */
+  streamProps(names: readonly string[], prio: number, onPlaced: (group: THREE.Group, name: string) => Promise<void>) {
+    return Promise.all(names.map(async (n) => {
+      let src: THREE.Object3D;
+      try { src = (await this.assets.model(n, prio)).scene; } catch (e) { console.warn('[world] missing prop', n, e); return; }
+      const group = this.placeProp(n, src, false);
+      await onPlaced(group, n);
+      this.scene.add(group);
+    }));
   }
 
   private async buildGround() {
     const A = this.assets;
-    const [sd, sn, sr, wd, wn, wr, waterN] = await Promise.all([
-      A.texture('textures/sand_01_diff.webp', true), A.texture('textures/sand_01_nor_gl.webp', false),
-      A.texture('textures/sand_01_rough.webp', false), A.texture('textures/wood_floor_deck_diff.webp', true),
-      A.texture('textures/wood_floor_deck_nor_gl.webp', false), A.texture('textures/wood_floor_deck_rough.webp', false),
-      A.texture('textures/waternormals.webp', false),
-    ]);
+    const srgb = (p: string) => p.endsWith('_diff.webp');
+    const [sd, sn, sr, wd, wn, wr, waterN] = await Promise.all(GROUND_TEX.map((p) => A.texture(p, srgb(p), PRIO.core)));
     this.waterNormals = waterN;
 
     // Island: flat walkable plateau, irregular shoreline, sloping into the sea. Pool cells cut out.
@@ -227,7 +240,6 @@ export class World {
       [P.x0 - m, P.x0, P.z0, P.z1], [P.x1, P.x1 + m, P.z0, P.z1],
     ];
     for (const [x0, x1, z0, z1] of cop) this.scene.add(box(x0, x1, -0.14, 0.05, z0, z1, stone, true));
-    this.collision.addRect(P.x0 - m, P.x1 + m, P.z0 - m, P.z1 + m);
   }
 
   private waterNormals!: THREE.Texture;
@@ -236,7 +248,7 @@ export class World {
     const P = POOL;
     const w = P.x1 - P.x0, d = P.z1 - P.z0, depth = 1.5;
     const tiles = new THREE.MeshStandardNodeMaterial({ side: THREE.BackSide, roughness: 0.3 });
-    this.assets.texture('textures/long_white_tiles_diff.webp', true).then((t) => {
+    this.assets.texture(POOL_TILES, true, PRIO.early).then((t) => {
       tiles.colorNode = texture(t, uv().mul(vec2(w / 1.2, d / 1.2))).rgb.mul(color(0x8fe9f2));
       tiles.needsUpdate = true;
     });
@@ -317,7 +329,7 @@ export class World {
     this.scene.add(this.bottle);
   }
 
-  private async buildProps(onProgress?: (p: number) => void) {
+  private specs(): PropSpec[] {
     const specs: PropSpec[] = [
       { name: 'villa', x: 0, z: -31.5, rot: 0, size: 26, by: 'w', solid: 'none' },
       { name: 'sofa', x: -13.6, z: -5.2, rot: 75, size: 3.9, by: 'w' },
@@ -351,22 +363,42 @@ export class World {
       specs.push({ name: 'torch', x, z, rot: 0, size: 2.3, by: 'h', solid: 'circle', r: 0.12 });
     }
     PALMS.forEach(([x, z, h], i) => specs.push({ name: 'palm', x, z, rot: i * 47, size: h, by: 'h', solid: 'circle', r: 0.35 }));
+    return specs;
+  }
 
-    const names = [...new Set(specs.map((s) => s.name))];
-    let done = 0;
-    const loaded = new Map<string, THREE.Object3D | null>();
-    await Promise.all(names.map(async (n) => {
-      try { loaded.set(n, (await this.assets.model(n)).scene); } catch (e) { console.warn('[world] missing prop', n, e); loaded.set(n, null); }
-      onProgress?.(0.1 + 0.5 * (++done / names.length));
-    }));
+  /** The whole collision map from layout data alone (pool, screen rects are added by their builders). */
+  private registerPropCollision() {
+    const P = POOL, m = 0.3;
+    this.collision.addRect(P.x0 - m, P.x1 + m, P.z0 - m, P.z1 + m);
+    for (const s of this.specs()) {
+      const solid = s.solid ?? 'box';
+      if (solid === 'circle') this.collision.addCircle(s.x, s.z, s.r ?? 0.5);
+      else if (solid === 'box') {
+        const fp = FOOTPRINT[s.name];
+        if (fp) this.collision.addBox(s.x, s.z, fp[0], fp[1], THREE.MathUtils.degToRad(s.rot));
+        else console.warn('[world] no footprint for', s.name);
+      }
+    }
+    for (let i = 0; i < 6; i++) {
+      // Benches: solid behind the seat line so seated characters can still be reached.
+      const p = seatPose(i);
+      this.collision.addCircle(BONFIRE.x + Math.cos(p.a) * (SEAT_R + 0.15), BONFIRE.z + Math.sin(p.a) * (SEAT_R + 0.15), 0.35);
+    }
+    // Arch feet.
+    const ar = THREE.MathUtils.degToRad(-55);
+    for (const sx of [-1.25, 1.25]) this.collision.addCircle(12.2 + Math.cos(ar) * sx, 5.8 - Math.sin(ar) * sx, 0.25);
+  }
 
+  /** Instances of one prop type as a single group (one precompile, one pop-in). Adds it to the scene unless told not to. */
+  placeProp(name: string, src: THREE.Object3D, add = true) {
+    const group = new THREE.Group();
+    group.name = `props:${name}`;
     const box3 = new THREE.Box3(), size = new THREE.Vector3();
-    for (const s of specs) {
-      const src = loaded.get(s.name);
-      if (!src) continue;
+    box3.setFromObject(src);
+    box3.getSize(size);
+    for (const s of this.specs()) {
+      if (s.name !== name) continue;
       const obj = src.clone();
-      box3.setFromObject(src);
-      box3.getSize(size);
       const k = s.size / (s.by === 'h' ? size.y : Math.max(size.x, size.z));
       obj.scale.setScalar(k);
       obj.position.set(s.x - ((box3.min.x + box3.max.x) / 2) * k, (s.y ?? 0) - box3.min.y * k, s.z - ((box3.min.z + box3.max.z) / 2) * k);
@@ -384,21 +416,14 @@ export class World {
           if (mat && 'roughness' in mat && !mat.roughnessMap) mat.roughness = Math.max(mat.roughness, 0.55);
         }
       });
-      this.scene.add(pivot);
+      group.add(pivot);
       if (s.name === 'flamingo') this.flamingo = pivot;
       if (s.name === 'torch') this.effects.addFire(s.x, size.y * k * 0.97, s.z, 0.32);
-      const solid = s.solid ?? 'box';
-      if (solid === 'circle') this.collision.addCircle(s.x, s.z, s.r ?? 0.5);
-      else if (solid === 'box') this.collision.addBox(s.x, s.z, size.x * k * 0.92, size.z * k * 0.92, THREE.MathUtils.degToRad(s.rot));
+      const fp = FOOTPRINT[s.name];
+      if (import.meta.env.DEV && fp && Math.abs(fp[0] - size.x * k * 0.92) > 0.05) console.warn('[world] footprint drift', s.name, fp, size.x * k * 0.92, size.z * k * 0.92);
     }
-    for (let i = 0; i < 6; i++) {
-      // Benches: solid behind the seat line so seated characters can still be reached.
-      const p = seatPose(i);
-      this.collision.addCircle(BONFIRE.x + Math.cos(p.a) * (SEAT_R + 0.15), BONFIRE.z + Math.sin(p.a) * (SEAT_R + 0.15), 0.35);
-    }
-    // Arch feet.
-    const ar = THREE.MathUtils.degToRad(-55);
-    for (const sx of [-1.25, 1.25]) this.collision.addCircle(12.2 + Math.cos(ar) * sx, 5.8 - Math.sin(ar) * sx, 0.25);
+    if (add) this.scene.add(group);
+    return group;
   }
 
   private buildStringLights() {

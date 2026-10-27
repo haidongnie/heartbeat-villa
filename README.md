@@ -22,14 +22,45 @@
 | 视角 | 拖动鼠标、滚轮缩放 | 拖动屏幕 |
 | 表情 | 1–6 或底部按钮 | 底部按钮 |
 | 送玫瑰 | 靠近某人后按 R | 🌹 按钮 |
+| 拥抱 / 亲吻 | 靠近某人后按 H / K（对方可以拒绝） | 🤗 / 💋 按钮 |
+| 回应邀请 | Y 接受 / N 拒绝 | 卡片按钮 |
+| 近距离语音 | M 开关麦克风 | 🎙️ 按钮 |
 | 聊天 | Enter | 输入框 |
 
+### 拥抱和亲吻
+自由交流时走近某人，就能发起拥抱或亲吻：
+- 对方是真人时会弹出确认卡片，8 秒不回应算拒绝。
+- 对方是 AI 时，按 TA 对你的好感决定接不接受。被拒绝会触发“当场被拒”花字，也会增加戏剧值。
+- AI 嘉宾之间、AI 对真人，也会主动发起互动。
+- 告白环节“双向奔赴”的情侣会拥抱，大结局时情侣会亲吻。
+
+### 近距离语音
+- 按 🎙️ 或 M 开麦，首次开麦时浏览器会请求麦克风权限。
+- 声音按两个角色之间的距离衰减：1.5 米内最清楚，14 米外听不到；左右声道跟着镜头方向。
+- 在选角大厅里所有人都能直接听到彼此。
+- 说话的人，名牌会发绿光。
+- 技术上是 WebRTC 点对点直连，信令走 Playroom。在一些严格的 NAT 网络下（例如部分手机网络）可能连不上；这时可以在仓库 Variables 里配置 `TURN_URL` / `TURN_USER`，在 Secrets 里配置 `TURN_CRED`，使用自己的 TURN 中继服务器。
+
 剧情、人设和每位嘉宾的秘密见 [GAME_DESIGN.md](GAME_DESIGN.md)。
+
+## 加载速度
+- **首屏**：只下载约 1.1MB。3D 场景出现前只需要天空、地面、别墅；角色和道具之后陆续“长”进场景。标题界面 1.5 秒内就能点。
+- **压缩**：
+  - 模型：动作数据去掉静止轨道，四元数量化到 12 位，meshopt high。
+  - 贴图：按用途分档 WebP。
+  - 天空：Ultra HDR 增益图 JPEG，从 4.5MB 降到 96KB。
+  - 字体：自托管子集，约 270KB，不依赖 Google Fonts。
+  - 合计：`public/` 从 22.4MB 降到约 9.6MB。
+- **按需加载**：联机库 Playroom 和 React 在点击标题按钮前才加载。three.js 单独分包，游戏代码更新后不必重新下载它。
+- **回访**：Service Worker 按内容哈希永久缓存，再次打开几乎秒开。
 
 ## 技术
 
 - **渲染**：Three.js r186 `WebGPURenderer`（不支持 WebGPU 时自动回退到 WebGL2）。使用 AgX 色调映射、HDRI 环境光、单盏投影太阳光，昼夜和暴雨的光照会过渡；后期是 TSL 节点做的 Bloom、调色和 SMAA。
-- **3D 资产**：全部角色和道具都由 [Meshy](https://www.meshy.ai) 的 `meshy-t2.5`（Smart Topology）文生 3D 生成，经过 PBR 精修。7 个角色走了自动绑骨，每个带 7–10 段动作。资产管线在 `tools/` 里。
+- **3D 资产**：
+  - 全部角色和道具都由 [Meshy](https://www.meshy.ai) 的 `meshy-t2.5`（Smart Topology）文生 3D 生成，经过 PBR 精修。7 个角色走了自动绑骨，每个带 7–10 段动作。
+  - 拥抱和亲吻是 Meshy **Text to Motion** 生成的 3 段动作，套用到每个角色的骨骼上（`tools/meshy-motion.mjs`）。有两段因为当时积分不足，用 `tools/retarget.mjs` 按骨骼标定重定向补齐，和 Meshy 官方结果逐骨骼误差为 0°。
+  - 资产管线都在 `tools/` 里。
 - **联机**：[Playroom Kit](https://joinplayroom.com)。房主跑“导演”状态机（`src/game/director.ts`），负责推进剧情、汇总秘密选择、驱动 AI 嘉宾。房主掉线后，下一位玩家会接着当房主。
 - **音频**：全部用 WebAudio 实时合成，不需要下载任何音频文件。
 
@@ -64,7 +95,10 @@ npm run build
 
 ```bash
 MESHY_API_KEY=你的密钥 npm run meshy -- --only 资产id   # 生成：预览 → 精修 → 绑骨 → 动作
-npm run assets:optimize -- 资产id                        # 压缩到 public/models，并生成立绘
+MESHY_API_KEY=你的密钥 node tools/meshy-motion.mjs        # 文字生成动作（拥抱/亲吻），套到每个角色
+npm run assets:optimize -- 资产id                        # 合并动作、压缩到 public/models，并生成立绘
+npm run assets:textures && npm run assets:env            # 地面贴图、Ultra HDR 天空
+npm run assets:fonts                                     # 改了界面文字后重新生成字体子集
 ```
 
 > API 密钥只通过环境变量传入，永远不要写进代码或提交到仓库。

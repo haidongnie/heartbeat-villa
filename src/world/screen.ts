@@ -174,12 +174,18 @@ export function makeNeonSign(level: UniformNode<'float', number>) {
   const c = document.createElement('canvas');
   c.width = 1024; c.height = 256;
   const g = c.getContext('2d')!;
-  g.font = '150px "ZCOOL KuaiLe", "PingFang SC", sans-serif';
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.lineWidth = 10; g.strokeStyle = '#ff4fa0'; g.shadowColor = '#ff4fa0'; g.shadowBlur = 30;
-  g.strokeText('心跳别墅', 512, 128);
-  g.shadowBlur = 0; g.fillStyle = '#ffd6ea'; g.fillText('心跳别墅', 512, 128);
+  const draw = () => {
+    g.clearRect(0, 0, c.width, c.height);
+    g.font = '150px "ZCOOL KuaiLe", "PingFang SC", sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 10; g.strokeStyle = '#ff4fa0'; g.shadowColor = '#ff4fa0'; g.shadowBlur = 30;
+    g.strokeText('心跳别墅', 512, 128);
+    g.shadowBlur = 0; g.fillStyle = '#ffd6ea'; g.fillText('心跳别墅', 512, 128);
+  };
+  draw();
   const tex = new THREE.CanvasTexture(c);
+  // The sign is built before the web font arrives; redraw once it has.
+  document.fonts?.load('150px "ZCOOL KuaiLe"', '心跳别墅').then(() => { draw(); tex.needsUpdate = true; }, () => {});
   tex.colorSpace = THREE.SRGBColorSpace;
   const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false });
   const s = texture(tex);

@@ -24,6 +24,8 @@ export class UI {
   onInvite?: () => void;
   onMute?: () => boolean;
   onSkip?: () => void;
+  onAct?: (kind: 'hug' | 'kiss') => void;
+  onMic?: () => void;
 
   // ---------- loading & title ----------
   progress(p: number, label = '') {
@@ -31,8 +33,35 @@ export class UI {
     if (label) $('#loading .hint').textContent = label;
   }
   hideLoading() { $('#loading').classList.add('gone'); }
+  /** Fatal boot error: take down everything layered over the error message. */
+  failBoot() {
+    $('#title').hidden = true;
+    $('#casting').hidden = true;
+    $('#hud').hidden = true;
+    $('#loadbar').hidden = true;
+    $('#loading').classList.remove('backdrop', 'gone');
+  }
+  /** The loading gradient becomes the title backdrop until the 3D scene is ready; progress moves to #loadbar. */
+  backdropMode() { $('#loading').classList.add('backdrop'); }
+  /** Non-blocking progress line shown over title / casting / HUD until the show assets are in. */
+  loadbar(p: number | null, label = '') {
+    const b = $('#loadbar');
+    b.hidden = p == null;
+    if (p == null) return;
+    $('i', b).style.width = `${Math.round(p * 100)}%`;
+    $('span', b).textContent = label;
+  }
+  /** While the show assets stream in, 开播 stays disabled and says how far along it is. */
+  loadGate(p: number | null) {
+    const start = $<HTMLButtonElement>('#casting .start');
+    if (p == null) { start.textContent = '🎬 开播！'; return; }
+    start.disabled = true;
+    start.textContent = `🎬 嘉宾化妆中 ${Math.round(p * 100)}%`;
+  }
+  titleShown = false;
 
   title(joining: boolean, onGo: () => void) {
+    this.titleShown = true;
     const t = $('#title');
     t.hidden = false;
     $('.go', t).textContent = joining ? '加入好友的别墅' : '开一间别墅';
@@ -43,7 +72,7 @@ export class UI {
   // ---------- casting ----------
   casting(opts: {
     name: string; invite: string; isHost: boolean; midShow: boolean;
-    taken: Partial<Record<CharId, string>>; mine?: CharId; players: string[];
+    taken: Partial<Record<CharId, string>>; mine?: CharId; players: string[]; ready: boolean;
     onPick: (c: CharId) => void; onName: (n: string) => void; onStart: () => void;
   }) {
     const box = $('#casting');
@@ -74,10 +103,12 @@ export class UI {
     $('.plist', box).innerHTML = opts.players.map((p) => `<li>${escapeHtml(p)}</li>`).join('');
     const start = $<HTMLButtonElement>('.start', box);
     start.hidden = !opts.isHost || opts.midShow;
-    start.disabled = !opts.mine;
+    start.disabled = !opts.mine || !opts.ready;
+    grid.classList.toggle('wait', opts.midShow && !opts.ready);
     start.onclick = opts.onStart;
     $('.waiting', box).textContent = opts.midShow
-      ? '节目正在直播中——选一位 AI 嘉宾，替 TA 入住别墅！'
+      ? (opts.ready ? '节目正在直播中——选一位 AI 嘉宾，替 TA 入住别墅！' : '节目正在直播中——别墅加载完成后，就能接管一位 AI 嘉宾')
+      : opts.mine && !opts.ready && !opts.isHost ? '已选好嘉宾，别墅还在加载……'
       : opts.isHost ? (opts.mine ? '人到齐了就开播吧。空位由 AI 嘉宾补上。' : '先选一位嘉宾') : '等待房主开播……';
   }
   hideCasting() { $('#casting').hidden = true; }
@@ -96,6 +127,8 @@ export class UI {
     $('.mute', hud).onclick = () => { $('.mute', hud).textContent = this.onMute?.() ? '🔇' : '🔊'; };
     hud.querySelectorAll<HTMLButtonElement>('.emotes button[data-a]').forEach((b) => { b.onclick = () => this.onEmote?.(b.dataset.a!); });
     $('.rose', hud).onclick = () => this.onRose?.();
+    hud.querySelectorAll<HTMLButtonElement>('.emotes button[data-k]').forEach((b) => { b.onclick = () => this.onAct?.(b.dataset.k as 'hug' | 'kiss'); });
+    for (const b of document.querySelectorAll<HTMLButtonElement>('.mic')) b.onclick = () => this.onMic?.();
     const input = $<HTMLInputElement>('.chat input', hud);
     input.onkeydown = (e) => {
       e.stopPropagation();
@@ -135,6 +168,41 @@ export class UI {
     b.innerHTML = state === 'ready' ? `🌹 送给 ${target} <kbd>R</kbd>` : '🌹 靠近某人送玫瑰';
   }
   emotes(on: boolean) { $('#hud .emotes').classList.toggle('off', !on); }
+
+  /** Hug/kiss buttons: hidden outside free roam, disabled when nobody is in reach, else name the target. */
+  private actSig: string | null | undefined;
+  actButtons(target: string | null) {
+    if (target === this.actSig) return;
+    this.actSig = target;
+    for (const b of document.querySelectorAll<HTMLButtonElement>('#hud .emotes button[data-k]')) {
+      b.hidden = target === null;
+      b.disabled = !target;
+      b.title = target ? `${b.dataset.k === 'hug' ? '拥抱' : '亲吻'} ${target}（${b.dataset.k === 'hug' ? 'H' : 'K'}）` : '靠近某人才能互动';
+    }
+  }
+
+  /** Incoming hug/kiss request: accept / refuse with a countdown (null hides it). */
+  private askTimer = 0;
+  askCard(text: string | null, seconds = 8, onAnswer?: (ok: boolean) => void) {
+    const c = $('#askcard');
+    clearTimeout(this.askTimer);
+    if (text == null) { c.hidden = true; return; }
+    $('p', c).textContent = text;
+    $<HTMLButtonElement>('.yes', c).onclick = () => onAnswer?.(true);
+    $<HTMLButtonElement>('.no', c).onclick = () => onAnswer?.(false);
+    const bar = $('.cd i', c);
+    bar.style.transition = 'none'; bar.style.width = '100%';
+    c.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.transition = `width ${seconds}s linear`; bar.style.width = '0%'; }));
+    this.askTimer = window.setTimeout(() => { c.hidden = true; }, seconds * 1000);
+  }
+
+  micState(on: boolean) {
+    for (const b of document.querySelectorAll<HTMLButtonElement>('.mic')) {
+      b.classList.toggle('on', on);
+      b.textContent = on ? (b.classList.contains('wide') ? '🎙️ 麦克风已开' : '🎙️') : (b.classList.contains('wide') ? '🔇 开麦聊天' : '🔇');
+    }
+  }
 
   feed(html: string) {
     const f = $('#hud .feed');

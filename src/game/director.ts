@@ -6,6 +6,7 @@ import { POIS, type Tod } from '../world/world';
 import type { Collision } from '../world/collision';
 import type { Character } from './character';
 import { net, players, type Cast, type NetPose, type Phase, type PhaseId, type Scores } from './net';
+import { ASK_COOLDOWN, ASK_TIMEOUT, INTERACT, aiAccepts, meetPoses, type Act, type Ask, type Kind } from './interactions';
 
 interface StepDef { id: PhaseId; ep: number; dur: number; tod: Tod; round?: number }
 
@@ -39,6 +40,8 @@ export interface DirectorHost {
   collision: Collision;
   /** Is the director allowed to move characters right now (free-roam phases)? */
   freeRoam(): boolean;
+  /** True once this client has every character loaded and is in the show (a freshly migrated host may not be). */
+  active(): boolean;
   /** Called on the host when an AI contestant should play a one-shot. */
   botEmote(c: CharId, anim: string): void;
 }
@@ -61,6 +64,13 @@ export class Director {
   private bots = new Map<CharId, Bot>();
   private publishT = 0;
   private flashDone = new Set<number>();
+  /** Hug/kiss requests waiting for a human answer. */
+  private pending = new Map<string, { ask: Ask; expires: number }>();
+  /** Contestant -> time (ms) until which they are asking, being asked or mid-act. */
+  private busy = new Map<CharId, number>();
+  private cooldown = new Map<CharId, number>();
+  private lastBotAct = 0;
+  private actSeq = 0;
 
   constructor(private readonly host: DirectorHost) {}
 
@@ -119,6 +129,9 @@ export class Director {
         this.flashDone.add(ph.seq);
         net.rpc.call('event', { k: 'flash', text: pick(DRAMA_FLASH) }, net.rpc.Mode.ALL);
       }
+    }
+    for (const [id, p] of this.pending) {
+      if (Date.now() > p.expires) { this.pending.delete(id); this.resolveAct(p.ask, false, 'timeout'); }
     }
     this.updateBots(dt, ph);
   }
@@ -358,6 +371,9 @@ export class Director {
   private updateBots(dt: number, ph: Phase) {
     const cast = this.cast();
     const chars = this.host.chars;
+    // A host that took over while its own client is still loading or not yet in the show: phases keep
+    // advancing, bots wait (publishing title-screen poses as 'npc' would teleport them for everyone).
+    if (chars.size < CHAR_IDS.length || !this.host.active()) return;
     const free = this.host.freeRoam();
     const npc: Record<string, NetPose> = {};
     for (const c of CHAR_IDS) {
@@ -411,6 +427,13 @@ export class Director {
     if (b.goal.follow) { const t = chars.get(b.goal.follow)!; gx = t.x; gz = t.z; stop = 1.4; }
     const dx = gx - ch.x, dz = gz - ch.z, dist = Math.hypot(dx, dz);
     if (dist < stop) {
+      // Arrived next to someone they like: sometimes go for a hug or a kiss (at most one AI move per ~15 s).
+      const partner = b.goal.follow;
+      if (partner && Date.now() - this.lastBotAct > 15000 && Math.random() < 0.35) {
+        const aff = this.aff()[c]?.[partner] ?? 0;
+        const kind: Kind = aff > 2.6 && Math.random() < 0.45 ? 'kiss' : 'hug';
+        if (aff > 1.4 && this.interact(c, partner, kind)) { this.lastBotAct = Date.now(); ch.ry = Math.atan2(dx, dz); ch.speed = 0; return; }
+      }
       // Arrived: linger (facing the partner if there is one); the goal is cleared when the wait ends.
       b.anim = b.goal.follow ? pick(['talk', 'talk', 'wave', 'heart', 'idle']) : pick(['idle', 'idle', 'talk', 'dance']);
       b.wait = b.anim === 'wave' || b.anim === 'heart' ? ch.clipDuration(b.anim) : rnd(3, 8);
@@ -430,6 +453,63 @@ export class Director {
     ch.speed = sp;
     b.anim = 'walk';
     this.host.botEmote(c, 'walk');
+  }
+
+  // ---------- hugs & kisses (host arbitrates, everyone stages the result) ----------
+  private freePhase() {
+    const id = net.get<Phase>('phase')?.id;
+    return id === 'roam' || id === 'text';
+  }
+
+  /** Someone asks someone else for a hug or kiss. Humans get asked; the AI decides from its feelings. */
+  interact(from: CharId, to: CharId, kind: Kind) {
+    const now = Date.now();
+    if (!this.freePhase() || from === to || !INTERACT[kind]) return false;
+    if ((this.busy.get(from) ?? 0) > now || (this.busy.get(to) ?? 0) > now || (this.cooldown.get(from) ?? 0) > now) return false;
+    const a = this.host.chars.get(from), b = this.host.chars.get(to);
+    if (!a || !b || Math.hypot(a.x - b.x, a.z - b.z) > INTERACT[kind].range + 1.2) return false; // slack for latency
+    const ask: Ask = { id: `${now.toString(36)}${(this.actSeq++).toString(36)}`, from, to, kind };
+    this.cooldown.set(from, now + ASK_COOLDOWN * 1000);
+    const hold = now + (ASK_TIMEOUT + 1) * 1000;
+    this.busy.set(from, hold); this.busy.set(to, hold);
+    const cast = this.cast();
+    for (const c of [from, to]) if (!Director.humanOf(cast, c)) this.react(c, 'idle', ASK_TIMEOUT); // AI stands still meanwhile
+    if (Director.humanOf(cast, to)) {
+      this.pending.set(ask.id, { ask, expires: now + ASK_TIMEOUT * 1000 });
+      net.rpc.call('ask', ask, net.rpc.Mode.ALL);
+    } else {
+      const ok = aiAccepts(kind, this.aff()[to]?.[from] ?? 0);
+      setTimeout(() => this.resolveAct(ask, ok, ok ? undefined : 'no'), 900 + Math.random() * 900);
+    }
+    return true;
+  }
+
+  /** A human target's answer; only the player who controls the target may answer. */
+  answer(id: string, ok: boolean, senderId: string) {
+    const p = this.pending.get(id);
+    if (!p || this.cast()[p.ask.to] !== senderId) return;
+    this.pending.delete(id);
+    this.resolveAct(p.ask, ok, ok ? undefined : 'no');
+  }
+
+  private resolveAct(ask: Ask, ok: boolean, reason?: 'no' | 'timeout') {
+    const a = this.host.chars.get(ask.from), b = this.host.chars.get(ask.to);
+    if (ok && (!a || !b || !this.freePhase())) { ok = false; reason = 'timeout'; } // the night moved on meanwhile
+    const act: Act = { ...ask, ok, reason };
+    const now = Date.now();
+    if (ok) {
+      act.poses = meetPoses(a!, b!, INTERACT[ask.kind].gap);
+      const until = now + INTERACT[ask.kind].dur * 1000;
+      this.busy.set(ask.from, until); this.busy.set(ask.to, until);
+      const h = ask.kind === 'kiss' ? 3 : 2;
+      this.bump([[ask.from, 'h', h], [ask.to, 'h', h]]);
+      this.like([[ask.from, ask.to, h * 0.6], [ask.to, ask.from, h * 0.6]]);
+    } else {
+      this.busy.delete(ask.from); this.busy.delete(ask.to);
+      this.bump([[ask.from, 'd', 2]]);
+      this.like([[ask.from, ask.to, -0.5]]);
+    }
+    net.rpc.call('act', act, net.rpc.Mode.ALL);
   }
 
   /** Host-side: make an AI contestant stop and play a reaction. */

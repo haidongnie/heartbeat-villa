@@ -8,9 +8,8 @@
   <meta property="og:title" content="心跳别墅 · Heartbeat Villa" />
   <meta property="og:description" content="来心跳别墅入住吧——送玫瑰、发心动短信、被大屏幕爆料、在篝火旁告白。" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💗</text></svg>" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet" />
+  <!-- Self-hosted subset fonts (tools/fonts.mjs): ~260 KB, no third-party origin (Google Fonts is often blocked in mainland China). -->
+  <link rel="stylesheet" href="/fonts/fonts.css" />
 </head>
 <body>
   <canvas id="c"></canvas>
@@ -30,6 +29,7 @@
         <div class="badge"><span class="ep"></span><span class="ph"></span><span class="timer" hidden></span></div>
         <div class="tools">
           <button class="skip" title="房主：跳过当前环节" hidden>⏭</button>
+          <button class="mic" title="开/关麦克风（M）：离得越近听得越清楚">🔇</button>
           <button class="invite" title="复制邀请链接">💌 邀请</button>
           <button class="mute" title="静音">🔊</button>
         </div>
@@ -45,13 +45,20 @@
           <button data-a="angry" title="生气 4">😤</button>
           <button data-a="shock" title="震惊 5">😱</button>
           <button data-a="dance" title="跳舞 6">💃</button>
+          <button data-k="hug" hidden disabled title="拥抱（H）">🤗</button>
+          <button data-k="kiss" hidden disabled title="亲吻（K）">💋</button>
           <button class="rose" hidden disabled>🌹</button>
         </div>
       </div>
       <div id="joy"><i></i></div>
-      <div class="help">WASD 移动 · Shift 快走 · 拖动鼠标转视角 · 1–6 表情 · R 送玫瑰 · Enter 聊天</div>
+      <div class="help">WASD 移动 · Shift 快走 · 拖动鼠标转视角 · 1–6 表情 · R 送玫瑰 · H 拥抱 · K 亲吻 · M 开麦 · Enter 聊天</div>
     </div>
 
+    <div id="askcard" hidden>
+      <p></p>
+      <div class="btns"><button class="yes">💗 接受 <kbd>Y</kbd></button><button class="no">✋ 拒绝 <kbd>N</kbd></button></div>
+      <div class="cd"><i></i></div>
+    </div>
     <div id="modal" hidden></div>
     <div id="finale" hidden></div>
 
@@ -65,6 +72,7 @@
         <label>你的昵称<input class="nick" maxlength="12" /></label>
         <div class="invite"><span>邀请朋友入住</span><input readonly /><button>复制链接</button></div>
         <div class="players"><span>已入住</span><ul class="plist"></ul></div>
+        <button class="mic wide" title="开/关麦克风（M）">🔇 开麦聊天</button>
         <button class="start" hidden>🎬 开播！</button>
       </aside>
     </div>
@@ -85,6 +93,7 @@
       <p class="hint">正在布置海岛……</p>
     </div>
     <div id="fade"></div>
+    <div id="loadbar" hidden><i></i><span></span></div>
   </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
