@@ -4,7 +4,7 @@
 
 一款 1–6 人联机的 3D 恋爱综艺网页游戏。打开链接，开一间别墅，把邀请链接发给朋友，大家一起入住。空出来的嘉宾位由 AI 补上，一个人也能玩。
 
-**▶ 在线游玩：** https://haydennie.github.io/heartbeat-villa/
+**▶ 在线游玩：** https://haidongnie.github.io/heartbeat-villa/
 
 ## 怎么玩
 
